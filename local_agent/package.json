@@ -1,0 +1,19 @@
+{
+  "name": "smart-cafe-local-agent",
+  "version": "1.0.0",
+  "description": "Local Playwright scraper agent — polls tgcloud bot API and executes SANA/GICA form automation",
+  "type": "module",
+  "main": "scraper.js",
+  "scripts": {
+    "start": "node scraper.js",
+    "install:browsers": "npx playwright install chromium"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "playwright": "^1.44.0",
+    "dotenv": "^16.4.5"
+  }
+}

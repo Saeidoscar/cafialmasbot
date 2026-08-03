@@ -1,0 +1,17 @@
+name = "smart-cafe-bot"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "smart-cafe-db"
+database_id   = "ee8bf3b1-3cb5-45dd-a647-f4db26654c24"
+
+[vars]
+BOT_TOKEN       = ""
+OPENAI_API_KEY  = ""
+OPENAI_BASE_URL = ""
+OPENAI_MODEL    = ""
+AGENT_API_KEY   = ""

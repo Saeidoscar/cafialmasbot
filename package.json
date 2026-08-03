@@ -1,0 +1,26 @@
+{
+  "name": "smart-cafe-bot",
+  "version": "1.0.0",
+  "description": "ربات هوشمند کافه اینترنت الماس — Express + SQLite",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start":    "node server.js",
+    "dev":      "node --watch server.js",
+    "test":     "node --test test.phase1.js",
+    "db:init":  "node -e \"import('./src/lib/db.js').then(m => m.getDb())\"",
+    "db:backup": "node -e \"import('./src/db/backup.js').then(m => m.backupDatabase())\"",
+    "db:migrate": "node -e \"import('./src/db/migration-runner.js').then(m => m.runMigrations())\"",
+    "db:rollback": "node -e \"import('./src/db/migration-runner.js').then(m => m.rollbackLastMigration())\"",
+    "setup:webhook": "node -e \"import('./src/lib/telegram.js').then(async m => { const api = m.createTelegramAPI(process.env.BOT_TOKEN); const r = await api.setWebhook({ url: process.env.APP_URL + '/webhook' }); console.log(r); })\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "dotenv":         "^16.4.5",
+    "express":        "^4.19.2"
+  },
+  "devDependencies": {}
+}

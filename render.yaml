@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: smart-cafe-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_PATH
+        value: /var/data/cafe.db
+      - key: BOT_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: AGENT_API_KEY
+        sync: false
+      - key: APP_URL
+        sync: false
+    disk:
+      name: cafe-data
+      mountPath: /var/data
+      sizeGB: 1
