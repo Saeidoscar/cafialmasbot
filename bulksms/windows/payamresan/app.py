@@ -74,18 +74,22 @@ def resource_path(rel: str) -> str:
 
 
 class Async(QObject):
-    """اجرای درخواست‌های شبکه در نخ جدا تا رابط گرافیکی قطع نشود."""
-    ok = Signal(object)
-    fail = Signal(str)
+    """اجرای درخواست‌های شبکه در نخ جدا تا رابط گرافیکی قطع نشود.
 
-    def run(self, fn, *args, **kwargs):
+    هر درخواست با یک برچسب (job) فرستاده می‌شود و همان برچسب با پاسخ برمی‌گردد،
+    بنابراین پاسخ‌های هم‌زمان (status/results/metrics) با هم قاطی نمی‌شوند.
+    """
+    ok = Signal(str, object)
+    fail = Signal(str, str)
+
+    def run(self, job: str, fn, *args, **kwargs):
         def work():
             try:
-                self.ok.emit(fn(*args, **kwargs))
+                self.ok.emit(job, fn(*args, **kwargs))
             except PhoneError as e:
-                self.fail.emit(str(e))
+                self.fail.emit(job, str(e))
             except Exception as e:      # noqa: BLE001
-                self.fail.emit(f"{type(e).__name__}: {e}")
+                self.fail.emit(job, f"{type(e).__name__}: {e}")
         threading.Thread(target=work, daemon=True).start()
 
 
@@ -101,7 +105,7 @@ class MainWindow(QMainWindow):
         self.async_jobs = Async()
         self.async_jobs.ok.connect(self.on_async_ok)
         self.async_jobs.fail.connect(self.on_async_fail)
-        self.pending_job = ""
+        self.inflight = set()          # کارهای در جریان (status/results/…)
         self.seen_results = {}
         self.result_rows = []
         self.out_dir = ""
@@ -508,10 +512,25 @@ class MainWindow(QMainWindow):
         return Phone(self.ed_host.text().strip(), self.sp_port.value(), self.ed_token.text().strip())
 
     # ------------------------------------------------------- اتصال و وضعیت
+    def submit(self, job: str, fn, *args, **kwargs) -> bool:
+        """ارسال یک کار به نخ پس‌زمینه؛ اگر همان کار در جریان باشد، رد می‌شود."""
+        if job in self.inflight:
+            return False
+        self.inflight.add(job)
+        try:
+            self.async_jobs.run(job, fn, *args, **kwargs)
+        except Exception as e:      # noqa: BLE001
+            self.inflight.discard(job)
+            self.log(f"خطا در اجرای کار {job}: {e}")
+            return False
+        return True
+
+    def busy(self) -> bool:
+        return bool(self.inflight)
+
     def test_connection(self):
         self.say("در حال تست اتصال…")
-        self.pending_job = "ping"
-        self.async_jobs.run(self.phone().ping)
+        self.submit("ping", self.phone().ping)
 
     def discover_phone(self):
         self.say("جست‌وجو در شبکه… (چند ثانیه طول می‌کشد)")
@@ -521,26 +540,24 @@ class MainWindow(QMainWindow):
             found = discover(port)
             return [{"ip": ip, "info": info} for ip, info in found]
 
-        self.pending_job = "discover"
-        self.async_jobs.run(work)
+        self.submit("discover", work)
 
     def refresh_sims(self):
-        self.pending_job = "sims"
-        self.async_jobs.run(self.phone().sims)
+        self.submit("sims", self.phone().sims)
 
     def apply_optouts(self):
-        self.pending_job = "optout"
-        self.async_jobs.run(self.phone().optouts)
+        self.submit("optout", self.phone().optouts)
 
     def poll(self):
         if not self.ed_host.text().strip():
             return
         self.poll_ticks += 1
-        self.pending_job = "status"
-        self.async_jobs.run(self.phone().status)
+        self.submit("status", self.phone().status)
 
-    def on_async_ok(self, data):
-        job, self.pending_job = self.pending_job, ""
+    def on_async_ok(self, job: str, data):
+        self.inflight.discard(job)
+        if not isinstance(data, dict):
+            return
         if job == "ping":
             self.info(
                 f"اتصال برقرار شد ✅\n\n"
@@ -589,11 +606,13 @@ class MainWindow(QMainWindow):
         elif job == "stop":
             self.say("ارسال متوقف شد")
 
-    def on_async_fail(self, msg):
-        self.pending_job = ""
-        self.lbl_conn.setText("اتصال: ⚠ قطع")
-        if not self.edt_log.toPlainText().endswith(msg):
-            self.log("خطا: " + msg)
+    def on_async_fail(self, job: str, msg):
+        self.inflight.discard(job)
+        if job in ("ping", "status", "sims", "discover", "start", "config"):
+            self.lbl_conn.setText("اتصال: ⚠ قطع")
+        tail = self.edt_log.toPlainText().splitlines()[-1:] or [""]
+        if not tail[0].endswith(msg):
+            self.log(f"[{job}] خطا: {msg}")
 
     def apply_status(self, data: dict):
         self.lbl_conn.setText("اتصال: ✅ برقرار")
@@ -602,11 +621,14 @@ class MainWindow(QMainWindow):
         failed = int(data.get("failed", 0))
         self.progress.setMaximum(max(total, 1))
         self.progress.setValue(done)
+        raw_state = data.get("state")
+        if not isinstance(raw_state, str):
+            raw_state = ""
         state_fa = {
             "IDLE": "آماده", "RUNNING": "در حال ارسال", "PAUSED": "توقف موقت",
             "WAITING_QUOTA": "انتظار سقف روزانه", "WAITING_WINDOW": "انتظار بازهٔ ساعتی",
             "DONE": "پایان یافت", "STOPPED": "متوقف",
-        }.get(data.get("state", ""), data.get("state", ""))
+        }.get(raw_state, raw_state or "—")
         self.lbl_progress.setText(
             f"وضعیت گوشی: {state_fa} — {data.get('last', '')}\n"
             f"کل: {total} • ارسال‌شده: {done} • خطا: {failed} • باقی‌مانده: {data.get('remaining', 0)} • "
@@ -620,11 +642,9 @@ class MainWindow(QMainWindow):
             f"وضعیت موتور گوشی: {state_fa}\nآخرین پیام: {data.get('last', '')}"
         )
         if self.poll_ticks % 4 == 0:
-            self.pending_job = "results"
-            self.async_jobs.run(self.phone().results)
+            self.submit("results", self.phone().results)
         if self.poll_ticks % 20 == 0:
-            self.pending_job = "metrics"
-            self.async_jobs.run(self.phone().metrics)
+            self.submit("metrics", self.phone().metrics)
 
     def apply_metrics(self, data: dict):
         rows = data.get("quota_history", [])
@@ -863,8 +883,8 @@ class MainWindow(QMainWindow):
             return
         cfg = self.save_settings()
         self.log(f"ارسال {len(contacts)} مخاطب به گوشی…")
-        self.pending_job = "start" if start else "config"
-        self.async_jobs.run(
+        self.submit(
+            "start" if start else "config",
             self.phone().send,
             contacts,
             self.edt_template.toPlainText(),
@@ -908,8 +928,7 @@ class MainWindow(QMainWindow):
         self.phone_action(action)
 
     def phone_action(self, action: str):
-        self.pending_job = action
-        self.async_jobs.run(self.phone().action, action)
+        self.submit(action, self.phone().action, action)
 
     def simulate(self):
         if not self.rep or not self.rep.valid:

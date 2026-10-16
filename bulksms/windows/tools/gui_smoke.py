@@ -122,7 +122,7 @@ def main() -> int:
     win.sp_port.setValue(MOCK_PORT)
     win.ed_token.setText(MOCK_TOKEN)
     win.test_connection()
-    if not wait_for(app, lambda: win.pending_job == "", timeout=15):
+    if not wait_for(app, lambda: not win.busy(), timeout=15):
         failures.append("تست اتصال به سرور جعلی پاسخ نداد")
     if not wait_for(app, lambda: win.cmb_sim.count() > 0 and "127" not in win.lbl_conn.text(), timeout=10):
         pass
@@ -130,7 +130,7 @@ def main() -> int:
 
     print("گام ۶: ارسال صف به گوشی (شبیه‌سازی‌شده) و پیگیری وضعیت")
     win.push_config(start=True)
-    wait_for(app, lambda: win.pending_job == "", timeout=20)
+    wait_for(app, lambda: not win.busy(), timeout=20)
     for _ in range(60):
         win.poll()
         spin(app, 0.15)
@@ -155,7 +155,17 @@ def main() -> int:
     win.refresh_sims()
     spin(app, 0.4)
 
-    print("گام ۷: گرفتن تصاویر تب‌ها")
+    print("گام ۷: تست هم‌زمانی درخواست‌ها (status/results/metrics)")
+    for _ in range(6):
+        win.poll()
+        win.submit("results", win.phone().results)
+        win.submit("metrics", win.phone().metrics)
+        spin(app, 0.1)
+    if not wait_for(app, lambda: not win.busy(), timeout=15):
+        failures.append("درخواست‌های هم‌زمان تمام نشدند (احتمال قفل شدن)")
+    print("  در جریان:", win.inflight)
+
+    print("گام ۸: گرفتن تصاویر تب‌ها")
     names = ["1-connection", "2-contacts", "3-message", "4-settings", "5-send"]
     for i, name in enumerate(names):
         win.tabs.setCurrentIndex(i)
