@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پیام‌رسان گروهی — ارسال پیامک با سیم‌کارت گوشی (APK + EXE)</title>
+<style>
+  :root{
+    --navy:#0f2a43; --navy2:#14304d; --green:#12a150; --green2:#0e8a43;
+    --ink:#132a3d; --muted:#5a6b7c; --line:#dce3ea; --bg:#f3f5f7; --card:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:Vazirmatn,"Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.9}
+  header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;padding:38px 22px 30px}
+  .wrap{max-width:1080px;margin:0 auto}
+  header h1{margin:0 0 8px;font-size:27px}
+  header p{margin:0;opacity:.92;font-size:15px}
+  .pills{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+        padding:5px 12px;border-radius:999px;font-size:13px}
+  main{max-width:1080px;margin:0 auto;padding:22px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;
+          padding:20px 22px;margin:18px 0;box-shadow:0 1px 2px rgba(16,42,67,.05)}
+  h2{margin:0 0 12px;font-size:20px;color:var(--navy)}
+  h3{margin:18px 0 8px;font-size:16px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:right;vertical-align:top}
+  th{background:#f7f9fb;font-weight:600}
+  code,pre{font-family:Consolas,Menlo,monospace;direction:ltr;text-align:left}
+  code{background:#eef3f7;padding:2px 6px;border-radius:6px;font-size:13px}
+  pre{background:#0f2a43;color:#e8eef4;padding:14px;border-radius:12px;overflow:auto;font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .box{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fbfcfd}
+  .box h4{margin:0 0 6px;font-size:15px;color:var(--navy)}
+  .ok{color:var(--green2);font-weight:700}
+  .bad{color:#b42318;font-weight:700}
+  .warn{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:0}
+  .steps li{counter-increment:s;position:relative;padding:10px 46px 10px 0;border-bottom:1px dashed var(--line)}
+  .steps li:last-child{border-bottom:0}
+  .steps li::before{content:counter(s);position:absolute;right:0;top:10px;width:30px;height:30px;
+    background:var(--green);color:#fff;border-radius:50%;display:grid;place-items:center;font-weight:700}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  a.btn{display:inline-block;background:var(--green);color:#fff;text-decoration:none;
+        padding:11px 18px;border-radius:10px;font-weight:600}
+  a.btn.alt{background:#fff;color:var(--navy);border:1px solid var(--line)}
+  footer{color:var(--muted);font-size:13px;text-align:center;padding:26px 18px 40px}
+  .en{direction:ltr;text-align:left}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>پیام‌رسان گروهی — ارسال پیامک با سیم‌کارت خودت</h1>
+    <p>یک اپ اندروید (<span class="en">APK</span>) برای ارسال با سیم‌کارت گوشی + یک برنامهٔ ویندوز
+       (<span class="en">EXE</span>) برای خواندن CSV، ساخت متن پیام و کنترل ارسال. بدون سرویس ابری، بدون درگاه واسطه.</p>
+    <div class="pills">
+      <span class="pill">CSV → پیامک</span>
+      <span class="pill">Poco M5s / همراه اول</span>
+      <span class="pill">سقف روزانه + فاصله‌گذاری</span>
+      <span class="pill">قوانین ستون شماره و نام</span>
+      <span class="pill">گزارش CSV هر ارسال</span>
+      <span class="pill">پل وای‌فای برای کامپیوتر</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <h2>در یک نگاه</h2>
+    <div class="grid">
+      <div class="box">
+        <h4>۱) اپ اندروید (خروجی APK)</h4>
+        فایل CSV را از حافظه یا دانلودها باز می‌کند، شماره‌ها را نرمال و اعتبارسنجی می‌کند،
+        متن پیام را برای هر نفر شخصی‌سازی می‌کند و <b>با سیم‌کارت انتخابی گوشی</b> می‌فرستد.
+        سقف روزانه، فاصلهٔ تصادفی، استراحت دسته‌ای، توقف/ادامه و لاگ روزانه دارد.
+      </div>
+      <div class="box">
+        <h4>۲) برنامهٔ ویندوز (خروجی EXE)</h4>
+        همان قوانین CSV را اجرا می‌کند، خطاها را لیست می‌دهد، قالب پیام با پیش‌نمایش زنده
+        می‌سازد، زمان و تعداد روز را محاسبه می‌کند و از طریق وای‌فای صف را روی گوشی می‌فرستد.
+      </div>
+      <div class="box">
+        <h4>۳) قوانین CSV نسخهٔ ۱.۰</h4>
+        ستون شماره با ۲۶ نام مجاز (فارسی/انگلیسی)، ستون نام اختیاری، ستون‌های کنترلی و
+        ستون‌های دلخواه با جان‌نگهدار <code>{نام‌ستون}</code>.
+      </div>
+    </div>
+    <div class="btns">
+      <a class="btn" href="https://github.com/Saeidoscar/cafialmasbot/actions/workflows/build-payamresan.yml">دریافت APK و EXE از GitHub Actions</a>
+      <a class="btn alt" href="docs/CSV_RULES.md">سند کامل قوانین CSV</a>
+      <a class="btn alt" href="docs/INSTALL.md">راهنمای نصب</a>
+      <a class="btn alt" href="docs/LIMITS_AND_LAW.md">محدودیت‌ها و قانون</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>گرفتن فایل‌های نهایی</h2>
+    <ol class="steps">
+      <li>به تب <b>Actions</b> مخزن بروید و آخرین اجرای <b>Build PayamResan (APK + EXE)</b> را باز کنید.</li>
+      <li>در پایین صفحه، بخش <b>Artifacts</b>:
+          <code>payamresan-android-apk</code> (فایل نصبی اندروید)،
+          <code>payamresan-windows-exe</code> (برنامهٔ ویندوز)،
+          <code>payamresan-gui-preview</code> (تصاویر محیط ویندوز).</li>
+      <li>فایل زیپ را دانلود و باز کنید؛ <code>app-release.apk</code> را روی گوشی و
+          <code>PayamResan-Setup.exe</code> را روی ویندوز نصب کنید.</li>
+      <li>در اپ گوشی: تب ۵ → «روشن کردن پل» → آدرس و توکن را در برنامهٔ ویندوز وارد کنید → «تست اتصال».</li>
+      <li>در ویندوز: فایل CSV را باز کنید، متن پیام را بنویسید، «شروع ارسال» را بزنید.</li>
+    </ol>
+    <p class="warn">اگر می‌خواهید همین حالا ساخت را اجرا کنید: Actions → Build PayamResan → <b>Run workflow</b>.
+      ساخت روی مخزن عمومی رایگان است. فایل‌ها تا ۹۰ روز در Artifacts می‌مانند.</p>
+  </section>
+
+  <section>
+    <h2>قوانین ستون شماره و ستون نام</h2>
+    <h3>ستون شماره — اجباری (یکی از این نام‌ها)</h3>
+    <p><code>number</code> · <code>phone</code> · <code>phone_number</code> · <code>mobile</code> ·
+       <code>mobile_number</code> · <code>cell</code> · <code>cellphone</code> · <code>tel</code> ·
+       <code>telephone</code> · <code>msisdn</code> · <code>contact</code> ·
+       <code>شماره</code> · <code>شماره تماس</code> · <code>شماره موبایل</code> ·
+       <code>شماره تلفن</code> · <code>شماره همراه</code> · <code>موبایل</code> ·
+       <code>تلفن</code> · <code>تلفن همراه</code> · <code>همراه</code></p>
+    <p>حساس به فاصله، <code>_</code>، <code>-</code>، نقطه و بزرگی/کوچکی حروف نیست:
+       <code>Phone Number</code> = <code>phone_number</code> = <code>PHONE-NUMBER</code>.</p>
+
+    <h3>ستون نام — اختیاری (برای <code>{name}</code>)</h3>
+    <p><code>name</code> · <code>full_name</code> · <code>display_name</code> ·
+       <code>نام</code> · <code>نام کامل</code> · <code>نام و نام خانوادگی</code> ·
+       یا دو ستون <code>first_name</code>/<code>نام کوچک</code> و <code>last_name</code>/<code>نام خانوادگی</code></p>
+
+    <h3>ستون‌های کنترلی — اختیاری</h3>
+    <table>
+      <tr><th>نقش</th><th>نام‌های مجاز</th><th>کاربرد</th></tr>
+      <tr><td>رد کردن ردیف</td><td><code>skip</code> · <code>رد</code> · <code>نفرست</code></td><td>مقدار ۱/بله → ارسال نمی‌شود</td></tr>
+      <tr><td>تأخیر همان ردیف</td><td><code>delay_ms</code> · <code>تاخیر</code></td><td>میلی‌ثانیه، مثلاً ۱۵۰۰۰</td></tr>
+      <tr><td>گروه</td><td><code>group</code> · <code>گروه</code> · <code>برچسب</code></td><td>در متن با <code>{group}</code></td></tr>
+      <tr><td>اپراتور اعلامی</td><td><code>provider</code> · <code>اپراتور</code></td><td>در حالت سخت‌گیرانه بررسی می‌شود</td></tr>
+      <tr><td>هر ستون دیگر</td><td>هر نامی</td><td>در متن با <code>{همان‌نام}</code></td></tr>
+    </table>
+
+    <h3>قالب‌های شمارهٔ پذیرفته‌شده</h3>
+    <table>
+      <tr><th>ورودی</th><th>نتیجه</th></tr>
+      <tr><td><code>09121234567</code></td><td><span class="ok">09121234567</span></td></tr>
+      <tr><td><code>۰۹۱۲۱۲۳۴۵۶۷</code> (ارقام فارسی)</td><td><span class="ok">09121234567</span></td></tr>
+      <tr><td><code>٠٩١٢١٢٣٤٥٦٧</code> (ارقام عربی)</td><td><span class="ok">09121234567</span></td></tr>
+      <tr><td><code>+989121234567</code> / <code>00989121234567</code></td><td><span class="ok">09121234567</span></td></tr>
+      <tr><td><code>0912 123 4567</code> / <code>0912-123-4567</code></td><td><span class="ok">09121234567</span></td></tr>
+      <tr><td><code>12345</code> یا <code>02188776655</code> یا <code>0812345678</code></td><td><span class="bad">رد می‌شود</span> (موبایل ایران نیست)</td></tr>
+      <tr><td><code>09123456789</code> / <code>09111111111</code></td><td><span class="bad">رد می‌شود</span> (نمونه/جعلی، ارقام یکسان)</td></tr>
+      <tr><td><code>09411234567</code></td><td><span class="bad">کنار گذاشته می‌شود</span> (سیم‌کارت مودم)</td></tr>
+    </table>
+
+    <h3>نمونهٔ فایل و نتیجهٔ تحلیل</h3>
+    <pre>name,number,group,delay_ms
+علی رضایی,09121234567,مشتری,5000
+مریم حسینی,+989351234568,همکار,
+سارا محمدی,۰۹۱۹۱۲۳۴۵۶۷,خانواده,3000</pre>
+    <pre>ستون شماره: «شماره»   |   ستون نام: «نام»   |   جداکننده: «,»   |   انکودینگ: UTF-8
+کل ردیف‌ها: 1200   ✅ معتبر: 1140   ❌ نامعتبر: 42   ♻ تکراری: 15   ⏭ ردشده: 3</pre>
+  </section>
+
+  <section>
+    <h2>ارسال ۱۰۰۰ پیام — طرح واقع‌بینانه</h2>
+    <p>سیم‌کارت شخصی در ایران سقف <b>۲۰۰ تا ۵۰۰ پیام در هر ۲۴ ساعت</b> دارد (هر پیامک فارسی
+       ۷۰ کاراکتر = ۱ صفحه). با پیش‌فرض‌های برنامه (سقف ۲۰۰، فاصلهٔ ۵ ثانیه، استراحت هر ۲۰ پیام)
+       ارسال ۱۰۰۰ پیام در <b>۵ روز</b> و هر روز حدود <b>۴۵ دقیقه</b> انجام می‌شود.</p>
+    <table>
+      <tr><th>تنظیم</th><th>مقدار پیشنهادی</th><th>چرا</th></tr>
+      <tr><td>سقف روزانه</td><td>۲۰۰</td><td>زیر سقف اپراتور بماند</td></tr>
+      <tr><td>فاصلهٔ ارسال</td><td>۵ ثانیه + نوسان ۳ ثانیه</td><td>الگوی رباتیک نداشته باشد</td></tr>
+      <tr><td>استراحت</td><td>هر ۲۰ پیام، ۵ دقیقه</td><td>شبیه رفتار انسانی</td></tr>
+      <tr><td>بازهٔ ساعتی</td><td>۹ تا ۲۱</td><td>پیام شب‌هنگام شکایت‌آور است</td></tr>
+      <tr><td>ادامهٔ خودکار</td><td>روشن</td><td>صف خودش در چند روز تمام شود</td></tr>
+    </table>
+    <div class="warn">
+      <b>هشدار:</b> ارسال تبلیغاتی انبوه با سیم‌کارت شخصی طبق مقررات محدود شده و عبور از سقف
+      می‌تواند به مسدود شدن سیم‌کارت منجر شود. همیشه در متن پیام راه لغو بگذارید
+      («برای لغو پاسخ دهید: لغو»)؛ برنامه پاسخ‌های لغو را می‌خواند و شماره را در لیست سیاه می‌گذارد.
+    </div>
+  </section>
+
+  <section>
+    <h2>برای عامل‌های هوش مصنوعی (AI Agents)</h2>
+    <p>اگر Agent شما فایل CSV می‌سازد، این دو فایل را به آن بدهید:</p>
+    <ul>
+      <li><code>schema/contacts.rules.json</code> — قرارداد ماشین‌خوان قوانین (ستون‌ها، مترادف‌ها، پیش‌شماره‌ها، دلایل رد)</li>
+      <li><code>docs/AGENT_PROMPT.md</code> — پرامپت آماده + اسکریپت بررسی خودکار خروجی</li>
+    </ul>
+    <p>برای اتوماسیون کامل روی کامپیوتر، پل HTTP گوشی در <code>docs/BRIDGE_API.md</code> مستند شده است
+       (نقاط پایانی <code>/parse</code>، <code>/send</code>، <code>/status</code>، <code>/results</code>، <code>/optout</code>).</p>
+  </section>
+
+  <section>
+    <h2>امکانات فنی</h2>
+    <div class="grid">
+      <div class="box"><h4>اپ اندروید</h4>
+        Kotlin خالص، بدون وابستگی سنگین، تشخیص انکودینگ (UTF-8/BOM/UTF-16/windows-1256) و
+        جداکننده (`,` `;` tab `|`)، پشتیبانی از فیلدهای داخل کوتیشن، ارسال چندبخشی،
+        انتظار برای نتیجهٔ واقعی هر پیامک، انتخاب سیم‌کارت (دو سیم)، سرویس پیش‌زمینه،
+        ذخیرهٔ صف برای ادامهٔ روز بعد، لاگ <code>sent-YYYY-MM-DD.csv</code>.
+      </div>
+      <div class="box"><h4>برنامهٔ ویندوز</h4>
+        PySide6 (رابط فارسی/RTL)، پنج تب، جدول مخاطبین، خروجی خطاها/لیست تمیز/گزارش،
+        پیش‌نمایش زندهٔ متن + شمارش پیامک (۷۰ فارسی / ۱۶۰ لاتین)، شبیه‌سازی بدون ارسال،
+        جست‌وجوی خودکار گوشی در شبکه، تاریخچهٔ ۱۴ روز، آیکن سینی سیستم.
+      </div>
+      <div class="box"><h4>پل وای‌فای (اختیاری)</h4>
+        سرور HTTP کوچک در گوشی با توکن، فقط برای شبکهٔ محلی: تحلیل CSV، بارگذاری صف،
+        شروع/توقف، وضعیت زنده، نتایج، خواندن صندوق پیام و اعمال «لغو»ها.
+      </div>
+    </div>
+    <p>تست‌های خودکار: <code>windows/tools/selftest.py</code> (۳۳ تست قوانین، نرمال‌سازی شماره،
+       تحلیل CSV، شمارش پیامک) و <code>windows/tools/gui_smoke.py</code> (ساخت رابط گرافیکی + تصاویر).</p>
+  </section>
+
+  <section class="en">
+    <h2 style="direction:ltr;text-align:left">English summary</h2>
+    <p><b>PayamResan</b> is a personal bulk-SMS toolkit that sends through your own SIM card.
+    An Android APK reads a CSV (required number column with English/Persian aliases,
+    optional name/group/skip/delay columns), validates and normalizes Iranian mobile numbers to
+    <code>09XXXXXXXXX</code>, personalizes the message per contact and sends with
+    <code>SmsManager</code> under a daily cap with randomized pacing, batch pauses, quiet hours,
+    pause/resume and CSV logging. A Windows EXE uses the identical rule engine, previews the
+    message with segment counting, and drives the phone over the LAN (<code>POST /send</code>).
+    Both artifacts are produced by GitHub Actions — download them from the run's Artifacts section.</p>
+    <p><b>Operator limit:</b> personal Iranian SIMs are capped at roughly 200–500 SMS per 24 h;
+    the app defaults to 200/day with 5 s spacing and a 5-minute pause every 20 messages.</p>
+  </section>
+
+  <footer>
+    ساخته‌شده برای استفادهٔ شخصی — ارسال با سیم‌کارت خودتان، بدون واسطه.
+    مسئولیت محتوا و رضایت گیرندگان با کاربر است.
+  </footer>
+</main>
+</body>
+</html>

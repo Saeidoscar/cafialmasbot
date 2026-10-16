@@ -46,3 +46,17 @@ temp/
 # Playwright
 local_agent/playwright-report/
 local_agent/test-results/
+
+# Bulk SMS toolkit build outputs
+bulksms/android/.gradle/
+bulksms/android/build/
+bulksms/android/app/build/
+bulksms/android/local.properties
+bulksms/android/*.jks
+bulksms/android/*.p12
+bulksms/windows/build/
+bulksms/windows/dist/
+bulksms/windows/gui-preview/
+bulksms/windows/*.spec
+out/
+out-key/

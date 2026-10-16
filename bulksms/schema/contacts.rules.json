@@ -1,0 +1,287 @@
+{
+  "name": "PayamResan CSV rules",
+  "version": "1.0",
+  "description": "Canonical CSV contract for the PayamResan bulk-SMS sender. Identical on Android and Windows.",
+  "header_matching": {
+    "case_sensitive": false,
+    "ignores": [
+      "spaces",
+      "underscores",
+      "hyphens",
+      "dots",
+      "quotes",
+      "bidi/invisible marks",
+      "ZWNJ"
+    ],
+    "note": "Column names are normalized before matching; e.g. 'Phone Number', 'phone_number' and 'phoneNumber' all match."
+  },
+  "columns": {
+    "number": {
+      "required": true,
+      "aliases": [
+        "number",
+        "شماره",
+        "phone",
+        "phone_number",
+        "phonenumber",
+        "mobile",
+        "mobile_number",
+        "mobilenumber",
+        "cell",
+        "cellphone",
+        "cell_phone",
+        "tel",
+        "telephone",
+        "msisdn",
+        "contact",
+        "contact_number",
+        "شماره تماس",
+        "شماره موبایل",
+        "موبایل",
+        "تلفن",
+        "تلفن همراه",
+        "شماره تلفن",
+        "شماره همراه",
+        "شمارهتماس",
+        "شمارهموبایل",
+        "همراه"
+      ],
+      "type": "string",
+      "description": "Mobile number. Accepted inputs are normalized to 09XXXXXXXXX (11 digits).",
+      "accepted_examples": [
+        "09121234567",
+        "۰۹۱۲۱۲۳۴۵۶۷",
+        "٠٩١٢١٢٣٤٥٦٧",
+        "0912 123 4567",
+        "0912-123-4567",
+        "+989121234567",
+        "00989121234567",
+        "989121234567"
+      ],
+      "rejected_examples": [
+        "12345",
+        "0212345678",
+        "0812345678",
+        "09123456789",
+        "09111111111",
+        "09411234567 (data-only SIM)"
+      ],
+      "normalization": [
+        "strip all non-digit characters except a leading +",
+        "Persian/Arabic-Indic digits to ASCII",
+        "strip 00/+/98 country prefix",
+        "strip leading 0",
+        "require 10 digits starting with 9",
+        "output 0 + 10 digits"
+      ]
+    },
+    "name": {
+      "required": false,
+      "aliases": [
+        "name",
+        "full_name",
+        "fullname",
+        "display_name",
+        "نام",
+        "نام کامل",
+        "اسم",
+        "نام و نام خانوادگی",
+        "نامکامل",
+        "نامونامخانوادگی"
+      ],
+      "description": "Full name. Used by the {name} placeholder. If missing, first_name + last_name are joined."
+    },
+    "first_name": {
+      "required": false,
+      "aliases": [
+        "first_name",
+        "firstname",
+        "given_name",
+        "givenname",
+        "نام کوچک",
+        "نامکوچک",
+        "اسمو"
+      ]
+    },
+    "last_name": {
+      "required": false,
+      "aliases": [
+        "last_name",
+        "lastname",
+        "family",
+        "family_name",
+        "surname",
+        "نام خانوادگی",
+        "فامیل",
+        "فامیلی",
+        "نامخانوادگی"
+      ]
+    },
+    "skip": {
+      "required": false,
+      "aliases": [
+        "skip",
+        "ignored",
+        "exclude",
+        "رد",
+        "ردیف_رد",
+        "نفرست"
+      ],
+      "description": "truthy value (1/true/yes/بله/رد) excludes the row"
+    },
+    "delay_ms": {
+      "required": false,
+      "aliases": [
+        "delay_ms",
+        "delay",
+        "تاخیر",
+        "تأخیر",
+        "تاخیر_ms"
+      ],
+      "type": "integer",
+      "description": "per-row extra delay in milliseconds"
+    },
+    "group": {
+      "required": false,
+      "aliases": [
+        "group",
+        "tag",
+        "group_name",
+        "گروه",
+        "برچسب",
+        "تگ"
+      ],
+      "description": "free-form tag, available as {group}"
+    },
+    "provider": {
+      "required": false,
+      "aliases": [
+        "provider",
+        "operator",
+        "carrier",
+        "اپراتور",
+        "همراه",
+        "مالک"
+      ],
+      "description": "declared operator; compared with the prefix in strict mode"
+    }
+  },
+  "placeholders": [
+    "name",
+    "number",
+    "first_name",
+    "last_name",
+    "index",
+    "group",
+    "date",
+    "time",
+    "{any CSV column name}"
+  ],
+  "operators": {
+    "همراه اول": [
+      "0910",
+      "0911",
+      "0912",
+      "0913",
+      "0914",
+      "0915",
+      "0916",
+      "0917",
+      "0918",
+      "0919",
+      "0990",
+      "0991",
+      "0992",
+      "0993",
+      "0994"
+    ],
+    "ایرانسل": [
+      "0900",
+      "0901",
+      "0902",
+      "0903",
+      "0904",
+      "0905",
+      "0930",
+      "0933",
+      "0935",
+      "0936",
+      "0937",
+      "0938",
+      "0939",
+      "0941"
+    ],
+    "رایتل": [
+      "0920",
+      "0921",
+      "0922"
+    ],
+    "تالیا": [
+      "0932"
+    ],
+    "اسپادان": [
+      "0931"
+    ],
+    "کیش": [
+      "0934"
+    ],
+    "شاتل‌موبایل": [
+      "09981"
+    ],
+    "نامشخص/MVNO": [
+      "0995",
+      "0996",
+      "0997",
+      "0998",
+      "0999"
+    ]
+  },
+  "fake_numbers": [
+    "09000000000",
+    "09100000000",
+    "09111111111",
+    "09120000000",
+    "09123456787",
+    "09123456788",
+    "09123456789",
+    "09190000000",
+    "09222222222",
+    "09333333333",
+    "09444444444",
+    "09555555555",
+    "09666666666",
+    "09777777777",
+    "09876543210",
+    "09888888888",
+    "09999999999"
+  ],
+  "datacard_prefixes": [
+    "0941"
+  ],
+  "encoding": {
+    "accepted": [
+      "UTF-8",
+      "UTF-8 with BOM",
+      "UTF-16LE/BE",
+      "windows-1256 (Excel Persian)"
+    ],
+    "recommended": "UTF-8 with BOM so Excel shows Persian correctly"
+  },
+  "delimiters": [
+    ",",
+    ";",
+    "\\t",
+    "|"
+  ],
+  "sms_encoding": {
+    "unicode_persian": {
+      "chars_per_segment": 70,
+      "chars_per_segment_multipart": 67
+    },
+    "gsm7_latin": {
+      "chars_per_segment": 160,
+      "chars_per_segment_multipart": 153
+    }
+  },
+  "operator_daily_limit_note": "Iranian operators restrict personal SIM cards to roughly 200-500 SMS per 24h; the app defaults to a 200/day cap with 5s spacing and a 300s pause every 20 messages."
+}

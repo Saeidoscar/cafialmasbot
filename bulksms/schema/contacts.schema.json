@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PayamResan contacts CSV",
+  "type": "object",
+  "properties": {
+    "number": {
+      "type": "string",
+      "description": "09121234567 or +989121234567 etc."
+    },
+    "name": {
+      "type": "string"
+    },
+    "first_name": {
+      "type": "string"
+    },
+    "last_name": {
+      "type": "string"
+    },
+    "group": {
+      "type": "string"
+    },
+    "delay_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 600000
+    },
+    "skip": {
+      "type": [
+        "boolean",
+        "integer",
+        "string"
+      ]
+    },
+    "provider": {
+      "type": "string",
+      "enum": [
+        "همراه اول",
+        "ایرانسل",
+        "رایتل",
+        "تالیا",
+        "اسپادان",
+        "کیش",
+        "شاتل‌موبایل",
+        "نامشخص/MVNO"
+      ]
+    }
+  },
+  "required": [
+    "number"
+  ],
+  "additionalProperties": true
+}

@@ -1,0 +1,187 @@
+name: Build PayamResan (APK + EXE)
+
+# ساخت خودکار دو خروجی نهایی:
+#   1) payamresan-android-apk   → اپ اندروید (.apk) برای ارسال با سیم‌کارت گوشی
+#   2) payamresan-windows-exe   → برنامهٔ ویندوز (.exe) برای تحلیل CSV و کنترل ارسال
+#
+# Builds both deliverables on every push/dispatch and stores them as run artifacts.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: "ساخت APK اندروید"
+        type: boolean
+        default: true
+      build_windows:
+        description: "ساخت EXE ویندوز"
+        type: boolean
+        default: true
+  push:
+    branches: ["main", "arena/**"]
+    paths:
+      - "bulksms/**"
+      - ".github/workflows/build-payamresan.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_android }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      # کلید امضا: اگر Secret موجود باشد استفاده می‌شود، وگرنه یک کلید ثابت از کش بازیابی
+      # یا ساخته می‌شود تا امضای نسخه‌ها بین بیلدها یکی بماند (نصب به‌روزرسانی ممکن شود).
+      - name: Restore signing key from cache
+        id: keycache
+        uses: actions/cache@v4
+        with:
+          path: .signing
+          key: payamresan-signing-key-v1
+
+      - name: Prepare signing key (secrets > cache > new)
+        env:
+          KEYSTORE_B64: ${{ secrets.PAYAMRESAN_KEYSTORE_B64 }}
+          PW: ${{ secrets.PAYAMRESAN_KEYSTORE_PASSWORD }}
+        run: |
+          set -e
+          mkdir -p .signing
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > .signing/payamresan.p12
+            echo "استفاده از کلید ذخیره‌شده در Secrets"
+          fi
+          if [ ! -f .signing/payamresan.p12 ]; then
+            PASS="${PW:-payamresan}"
+            keytool -genkeypair -v \
+              -keystore .signing/payamresan.p12 -storetype PKCS12 \
+              -storepass "$PASS" -keypass "$PASS" \
+              -alias payamresan -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=PayamResan, OU=Personal, O=PayamResan, L=Tehran, C=IR"
+            echo "$PASS" > .signing/password.txt
+            echo "کلید امضای جدید ساخته شد (برای نسخه‌های بعدی در کش نگه داشته می‌شود)"
+          fi
+          PW_USE="$PW"
+          if [ -z "$PW_USE" ] && [ -f .signing/password.txt ]; then PW_USE="$(cat .signing/password.txt)"; fi
+          PW_USE="${PW_USE:-payamresan}"
+          echo "RELEASE_STORE_FILE=$PWD/.signing/payamresan.p12" >> "$GITHUB_ENV"
+          echo "RELEASE_STORE_PASSWORD=$PW_USE" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=payamresan" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=$PW_USE" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: |
+          gradle -p bulksms/android --no-daemon \
+            -PversionCodeIn=${{ github.run_number }} \
+            -PversionNameIn=1.0.${{ github.run_number }} \
+            assembleDebug assembleRelease
+
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          find bulksms/android/app/build/outputs/apk -name "*.apk" -exec cp {} out/ \;
+          ls -lh out
+          (cd out && sha256sum *.apk > SHA256SUMS-apk.txt)
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: payamresan-android-apk
+          path: out/**
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Save signing key if newly created
+        if: steps.keycache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p out-key
+          cp .signing/payamresan.p12 out-key/ 2>/dev/null || true
+          if [ -f .signing/password.txt ]; then
+            printf 'رمز کلید: %s\n\nاین کلید امضای نسخه‌های این برنامه است.\nبرای اینکه امضای APKهای بعدی تغییر نکند، محتوای base64 این فایل را در\nSettings → Secrets and variables → Actions به نام PAYAMRESAN_KEYSTORE_B64\nو رمز را به نام PAYAMRESAN_KEYSTORE_PASSWORD ذخیره کنید:\n\n  base64 -w0 payamresan.p12\n' "$(cat .signing/password.txt)" > out-key/README.txt
+          fi
+          ls -la out-key
+        shell: bash
+
+      - name: Upload signing key
+        if: steps.keycache.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: payamresan-signing-key
+          path: out-key/**
+          retention-days: 90
+
+  windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: bulksms/windows/requirements.txt
+
+      - name: Install dependencies
+        working-directory: bulksms/windows
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Smoke-test core rules (no GUI)
+        working-directory: bulksms/windows
+        run: python tools/selftest.py
+
+      - name: Smoke-test GUI (offscreen) + screenshots
+        working-directory: bulksms/windows
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python tools/gui_smoke.py gui-preview
+
+      - name: Upload GUI screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: payamresan-gui-preview
+          path: bulksms/windows/gui-preview/**
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Build EXE
+        working-directory: bulksms/windows
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name PayamResan-Setup
+          --add-data "payamresan/icon.png;payamresan"
+          --exclude-module tkinter
+          --exclude-module PySide6.QtWebEngineCore
+          PayamResan.py
+
+      - name: Package
+        shell: pwsh
+        working-directory: bulksms/windows
+        run: |
+          New-Item -ItemType Directory -Force -Path ..\..\out | Out-Null
+          Copy-Item dist\PayamResan-Setup.exe ..\..\out\
+          Copy-Item run.bat,README.md ..\..\out\
+          Get-FileHash ..\..\out\PayamResan-Setup.exe -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  PayamResan-Setup.exe" } | Set-Content ..\..\out\SHA256SUMS-exe.txt
+          Get-ChildItem ..\..\out
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: payamresan-windows-exe
+          path: out/**
+          if-no-files-found: error
+          retention-days: 90
