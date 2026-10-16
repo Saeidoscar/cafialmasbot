@@ -26,6 +26,67 @@ def check(name, cond, extra=""):
         FAILED.append(name)
 
 
+# ---------------------------------------------------------------- parity check
+KOTLIN_LISTS = {
+    "NUMBER_HEADERS": rules.NUMBER_HEADERS,
+    "NAME_HEADERS": rules.NAME_HEADERS,
+    "FIRST_HEADERS": rules.FIRST_HEADERS,
+    "LAST_HEADERS": rules.LAST_HEADERS,
+    "SKIP_HEADERS": rules.SKIP_HEADERS,
+    "DELAY_HEADERS": rules.DELAY_HEADERS,
+    "GROUP_HEADERS": rules.GROUP_HEADERS,
+    "PROVIDER_HEADERS": rules.PROVIDER_HEADERS,
+    "BUILTIN_PLACEHOLDERS": rules.BUILTIN_PLACEHOLDERS,
+}
+
+
+def parse_kotlin_lists(text: str) -> dict:
+    """استخراج رشته‌های داخل listOf(...) برای هر val در فایل Kotlin."""
+    import re
+    out = {}
+    for name in KOTLIN_LISTS:
+        m = re.search(rf"val {name}\s*=\s*listOf\((.*?)\)", text, re.S)
+        if not m:
+            continue
+        out[name] = re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1))
+    return out
+
+
+def check_parity():
+    """قوانین ویندوز == قوانین اندروید == schema (تا هرگز واگرا نشوند)."""
+    import json
+    import pathlib
+
+    base = pathlib.Path(__file__).resolve().parents[2]        # پوشهٔ bulksms/
+    kt = base / "android/app/src/main/java/ir/payamresan/bulk/Rules.kt"
+    schema_path = base / "schema/contacts.rules.json"
+
+    if kt.exists():
+        kotlin = parse_kotlin_lists(kt.read_text(encoding="utf-8"))
+        for name, py_list in KOTLIN_LISTS.items():
+            kt_list = kotlin.get(name)
+            if kt_list is None:
+                check(f"parity: {name} در Rules.kt پیدا شد", False)
+                continue
+            check(f"parity: {name} اندروید == ویندوز", [x.strip() for x in kt_list] == list(py_list),
+                  f"اندروید={kt_list} ویندوز={list(py_list)}")
+    else:
+        print("SKIP  parity: فایل Rules.kt اندروید پیدا نشد")
+
+    if schema_path.exists():
+        data = json.loads(schema_path.read_text(encoding="utf-8"))
+        check("parity: نسخهٔ schema == نسخهٔ قوانین", data.get("version") == rules.RULES_VERSION,
+              f"schema={data.get('version')} rules={rules.RULES_VERSION}")
+        check("parity: مترادف‌های شماره در schema",
+              data["columns"]["number"]["aliases"] == list(rules.NUMBER_HEADERS))
+        check("parity: مترادف‌های نام در schema",
+              data["columns"]["name"]["aliases"] == list(rules.NAME_HEADERS))
+        check("parity: پیش‌شماره‌های اپراتور در schema",
+              data["operators"] == {n: list(p) for n, p in rules.OPERATORS})
+    else:
+        print("SKIP  parity: فایل schema/contacts.rules.json پیدا نشد")
+
+
 def main():
     print(f"قوانین نسخهٔ {rules.RULES_VERSION}")
 
@@ -102,6 +163,9 @@ def main():
     rep2 = csvio.analyze(h2, r2, "sample.csv")
     check("نمونهٔ CSV بدون خطا", len(rep2.valid) == 4 and not rep2.invalid,
           f"valid={len(rep2.valid)} invalid={rep2.invalid}")
+
+    # --- هم‌خوانی قوانین پایتون با Kotlin (اپ اندروید) و schema
+    check_parity()
 
     print()
     if FAILED:
