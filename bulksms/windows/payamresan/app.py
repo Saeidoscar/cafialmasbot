@@ -674,7 +674,22 @@ class MainWindow(QMainWindow):
             self.log(f"لاگ‌گیری ناموفق: {e}")
 
     # ------------------------------------------------------------ CSV و پیام
+    def ask_save_path(self, caption: str, default_name: str) -> str:
+        """انتخاب مسیر ذخیره؛ در حالت بی‌سر (تست/CI) بدون دیالوگ."""
+        if HEADLESS:
+            d = self.out_dir or os.getcwd()
+            try:
+                os.makedirs(d, exist_ok=True)
+            except Exception:
+                d = os.getcwd()
+            return os.path.join(d, default_name)
+        path, _ = QFileDialog.getSaveFileName(self, caption, default_name, "CSV (*.csv)")
+        return path or ""
+
     def pick_csv(self):
+        if HEADLESS:
+            self.log("[headless] انتخاب فایل نادیده گرفته شد")
+            return
         path, _ = QFileDialog.getOpenFileName(self, "انتخاب فایل مخاطبین", "", "CSV (*.csv *.txt);;همهٔ فایل‌ها (*)")
         if path:
             self.load_csv(path)
@@ -761,9 +776,13 @@ class MainWindow(QMainWindow):
     def update_preview(self):
         text = self.edt_template.toPlainText()
         rep = self.rep
-        sample = rep.contacts[0] if rep and rep.contacts else {
-            "name": "نمونه", "number": "09121234567", "raw": "09121234567", "group": "", "fields": {}
-        }
+        if rep and rep.contacts:
+            c = rep.contacts[0]
+            sample = {"name": c.name, "number": c.number or c.raw, "raw": c.raw,
+                      "group": c.group, "fields": c.fields}
+        else:
+            sample = {"name": "نمونه", "number": "09121234567", "raw": "09121234567",
+                      "group": "", "fields": {}}
         rendered = rules.render_template(text, sample, 0)
         parts, gsm = rules.segments(rendered)
         enc = "GSM-7 (لاتین)" if gsm else "یونیکد UTF-16 (فارسی/غیرلاتین)"
@@ -774,7 +793,7 @@ class MainWindow(QMainWindow):
         )
 
     def save_sample_csv(self):
-        path, _ = QFileDialog.getSaveFileName(self, "ذخیرهٔ نمونهٔ CSV", "sample-contacts.csv", "CSV (*.csv)")
+        path = self.ask_save_path("ذخیرهٔ نمونهٔ CSV", "sample-contacts.csv")
         if not path:
             return
         try:
@@ -790,7 +809,7 @@ class MainWindow(QMainWindow):
             self.warn("ردیف نامعتبری وجود ندارد.")
             return
         headers, rows = csvio.invalid_rows_csv(self.rep)
-        path, _ = QFileDialog.getSaveFileName(self, "ذخیرهٔ ردیف‌های نامعتبر", "invalid-rows.csv", "CSV (*.csv)")
+        path = self.ask_save_path("ذخیرهٔ ردیف‌های نامعتبر", "invalid-rows.csv")
         if path:
             csvio.write_file(path, headers, rows)
             self.say(f"ذخیره شد: {path}")
@@ -800,7 +819,7 @@ class MainWindow(QMainWindow):
             self.warn("اول یک فایل انتخاب کنید.")
             return
         headers, rows = csvio.contacts_csv(self.rep)
-        path, _ = QFileDialog.getSaveFileName(self, "ذخیرهٔ لیست تمیز", "clean-contacts.csv", "CSV (*.csv)")
+        path = self.ask_save_path("ذخیرهٔ لیست تمیز", "clean-contacts.csv")
         if path:
             csvio.write_file(path, headers, rows)
             self.say(f"ذخیره شد: {path}")
@@ -809,7 +828,7 @@ class MainWindow(QMainWindow):
         if not self.result_rows:
             self.warn("گزارشی برای ذخیره وجود ندارد.")
             return
-        path, _ = QFileDialog.getSaveFileName(self, "ذخیرهٔ گزارش", "report.csv", "CSV (*.csv)")
+        path = self.ask_save_path("ذخیرهٔ گزارش", "report.csv")
         if path:
             csvio.write_file(path, ["time", "number", "name", "operator", "status", "parts", "error"], self.result_rows)
             self.say(f"گزارش ذخیره شد: {path}")

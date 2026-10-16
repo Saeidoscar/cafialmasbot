@@ -146,11 +146,20 @@ bulksms/
 │   ├── payamresan/csvio.py       خواندن/نوشتن CSV
 │   ├── payamresan/phone.py       کلاینت پل گوشی + جست‌وجوی شبکه
 │   ├── payamresan/app.py         رابط گرافیکی (۵ تب)
-│   └── tools/                    selftest.py و gui_smoke.py
+│   └── tools/                    selftest.py، gui_smoke.py، mock_phone.py
 ├── schema/                       قرارداد ماشین‌خوان قوانین
 ├── samples/                      نمونه فایل‌های CSV
 └── docs/                         مستندات + صفحهٔ HTML
 ```
+
+## تست بدون گوشی
+
+```bash
+cd bulksms/windows
+python tools/mock_phone.py            # سرور جعلی پل گوشی روی 127.0.0.1:8765 (توکن testtoken)
+```
+سپس در برنامهٔ ویندوز همان آدرس/پورت/توکن را وارد کنید: تحلیل CSV، صف، ارسال شبیه‌سازی‌شده،
+پیشرفت زنده و گزارش CSV — همه بدون ارسال پیامک واقعی. جزئیات: `docs/INSTALL.md`.
 
 ## ساخت خودکار
 
