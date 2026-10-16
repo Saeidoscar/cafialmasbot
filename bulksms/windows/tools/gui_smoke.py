@@ -15,6 +15,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["PAYAMRESAN_HEADLESS"] = "1"
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtCore import Qt                                  # noqa: E402
@@ -39,8 +40,10 @@ def main() -> int:
     out = sys.argv[1] if len(sys.argv) > 1 else "."
     os.makedirs(out, exist_ok=True)
 
+    print("گام ۱: ساخت QApplication")
     app = QApplication(sys.argv[:1])
     app.setLayoutDirection(Qt.RightToLeft)
+    print("گام ۲: ساخت پنجرهٔ اصلی")
     win = MainWindow()
     win.resize(1150, 830)
     win.show()
@@ -52,6 +55,7 @@ def main() -> int:
         for i, (n, num, g) in enumerate(DEMO_ROWS):
             f.write(f"{n},{num},{g},{5000 if i % 2 == 0 else ''}\n")
 
+    print("گام ۳: خواندن فایل نمونه")
     win.load_csv(csv_path)
     win.edt_template.setPlainText(SAMPLES[0][1])
     win.edt_host.setText("192.168.1.45")
@@ -59,6 +63,7 @@ def main() -> int:
     app.processEvents()
 
     names = ["1-connection", "2-contacts", "3-message", "4-settings", "5-send"]
+    print("گام ۴: گرفتن تصاویر تب‌ها")
     for i, name in enumerate(names):
         win.tabs.setCurrentIndex(i)
         app.processEvents()

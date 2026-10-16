@@ -90,7 +90,7 @@ object Engine {
         finishedAt = 0
         state = State.RUNNING
         val t = Thread { loop(context.applicationContext) }
-        t.isBackground = true
+        t.isDaemon = true
         t.name = "bulk-sms-loop"
         thread = t
         t.start()

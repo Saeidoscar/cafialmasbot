@@ -29,6 +29,9 @@ from .phone import Phone, PhoneError, discover
 APP_NAME = "PayamResan Desktop"
 APP_VERSION = "1.0.0"
 
+# حالت بی‌سر (تست خودکار/CI): هیچ پنجرهٔ مودالی باز نمی‌شود تا اجرا قفل نکند.
+HEADLESS = os.environ.get("PAYAMRESAN_HEADLESS") == "1"
+
 SAMPLES = [
     ("دعوت رسمی",
      "{name} عزیز، سلام.\nاین پیام از طرف مجموعهٔ ما ارسال شده است.\nبا تشکر — برای لغو پاسخ دهید: لغو"),
@@ -398,6 +401,9 @@ class MainWindow(QMainWindow):
 
     # -------------------------------------------------------------------- tray
     def build_tray(self):
+        if HEADLESS:
+            self.tray = None
+            return
         icon_path = resource_path(os.path.join("payamresan", "icon.png"))
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
@@ -487,9 +493,15 @@ class MainWindow(QMainWindow):
         self.edt_log.moveCursor(QTextCursor.End)
 
     def warn(self, msg: str):
+        if HEADLESS:
+            self.log("[headless][warn] " + msg.replace("\n", " / "))
+            return
         QMessageBox.warning(self, "هشدار", msg)
 
     def info(self, msg: str, title="اطلاع"):
+        if HEADLESS:
+            self.log("[headless][info] " + msg.replace("\n", " / "))
+            return
         QMessageBox.information(self, title, msg)
 
     def phone(self) -> Phone:
@@ -865,6 +877,9 @@ class MainWindow(QMainWindow):
             "ارسال با سیم‌کارت گوشی آغاز شود؟\n"
             "پس از شروع، برنامه را باز نگه دارید؛ گوشی به شبکهٔ GSM وصل بماند."
         )
+        if HEADLESS:
+            self.log("[headless] تأیید شروع ارسال رد شد (حالت بی‌سر)")
+            return
         if QMessageBox.question(self, "تأیید شروع ارسال", msg) == QMessageBox.Yes:
             self.push_config(start=True)
 
@@ -942,6 +957,9 @@ class MainWindow(QMainWindow):
                        + LIMITS_TEXT.replace("<", "&lt;") + "</pre>")
 
     def show_html(self, title: str, html: str):
+        if HEADLESS:
+            self.log(f"[headless] راهنما: {title}")
+            return
         d = QDialog(self)
         d.setWindowTitle(title)
         d.resize(760, 620)

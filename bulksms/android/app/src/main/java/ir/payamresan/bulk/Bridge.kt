@@ -49,7 +49,7 @@ object Bridge {
         server = ss
         running = true
         val t = Thread { acceptLoop(ss) }
-        t.isBackground = true
+        t.isDaemon = true
         t.name = "bridge"
         thread = t
         t.start()
@@ -93,7 +93,7 @@ object Bridge {
         while (running) {
             try {
                 val s = ss.accept()
-                Thread { handle(s) }.apply { isBackground = true }.start()
+                Thread { handle(s) }.apply { isDaemon = true }.start()
             } catch (e: Exception) {
                 if (running) Thread.sleep(200)
             }
