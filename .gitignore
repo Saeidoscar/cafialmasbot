@@ -60,3 +60,8 @@ bulksms/windows/gui-preview/
 bulksms/windows/*.spec
 out/
 out-key/
+
+# Python caches
+__pycache__/
+*.py[cod]
+bulksms/windows/payamresan-out/
