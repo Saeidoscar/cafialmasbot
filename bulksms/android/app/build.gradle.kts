@@ -13,7 +13,6 @@ android {
         targetSdk = 34
         versionCode = (project.findProperty("versionCodeIn") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("versionNameIn") as String?) ?: "1.0.0"
-        resourceConfigurations += listOf("fa", "en")
     }
 
     // امضای نسخهٔ release: اگر فایل کلید تنظیم شده باشد استفاده می‌شود، وگرنه کلید debug.

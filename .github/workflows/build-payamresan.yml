@@ -5,6 +5,7 @@ name: Build PayamResan (APK + EXE)
 #   2) payamresan-windows-exe   → برنامهٔ ویندوز (.exe) برای تحلیل CSV و کنترل ارسال
 #
 # Builds both deliverables on every push/dispatch and stores them as run artifacts.
+# Hints for the repository owner: open the run, then read the "Artifacts" section.
 
 on:
   workflow_dispatch:
@@ -82,12 +83,26 @@ jobs:
 
       - name: Build APK
         run: |
-          gradle -p bulksms/android --no-daemon \
+          set -o pipefail
+          gradle -p bulksms/android --no-daemon --stacktrace \
             -PversionCodeIn=${{ github.run_number }} \
             -PversionNameIn=1.0.${{ github.run_number }} \
-            assembleDebug assembleRelease
+            assembleDebug assembleRelease 2>&1 | tee build-android.log
+
+      # در صورت خطا، پیام‌های مهم به‌صورت annotation روی اجرا ثبت می‌شوند تا در
+      # صفحهٔ Actions (و API) قابل دیدن باشند.
+      - name: Report Android build errors
+        if: failure()
+        run: |
+          echo "----- آخرین خطوط لاگ -----"
+          tail -50 build-android.log || true
+          echo "----- خطاهای کلیدی ====="
+          grep -n -E "^e: |error:|ERROR:|What went wrong|FAILURE:|Execution failed|Could not (resolve|find|download)|Caused by|FAILED$|Unresolved|Compilation error|A problem occurred" build-android.log 2>/dev/null \
+            | head -25 | cut -c1-450 \
+            | while IFS= read -r line; do echo "::error::$line"; done || true
 
       - name: Collect APKs
+        if: success()
         run: |
           mkdir -p out
           find bulksms/android/app/build/outputs/apk -name "*.apk" -exec cp {} out/ \;
@@ -95,6 +110,7 @@ jobs:
           (cd out && sha256sum *.apk > SHA256SUMS-apk.txt)
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: payamresan-android-apk
@@ -103,7 +119,7 @@ jobs:
           retention-days: 90
 
       - name: Save signing key if newly created
-        if: steps.keycache.outputs.cache-hit != 'true'
+        if: success() && steps.keycache.outputs.cache-hit != 'true'
         run: |
           mkdir -p out-key
           cp .signing/payamresan.p12 out-key/ 2>/dev/null || true
@@ -111,10 +127,9 @@ jobs:
             printf 'رمز کلید: %s\n\nاین کلید امضای نسخه‌های این برنامه است.\nبرای اینکه امضای APKهای بعدی تغییر نکند، محتوای base64 این فایل را در\nSettings → Secrets and variables → Actions به نام PAYAMRESAN_KEYSTORE_B64\nو رمز را به نام PAYAMRESAN_KEYSTORE_PASSWORD ذخیره کنید:\n\n  base64 -w0 payamresan.p12\n' "$(cat .signing/password.txt)" > out-key/README.txt
           fi
           ls -la out-key
-        shell: bash
 
       - name: Upload signing key
-        if: steps.keycache.outputs.cache-hit != 'true'
+        if: success() && steps.keycache.outputs.cache-hit != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: payamresan-signing-key
@@ -124,6 +139,10 @@ jobs:
   windows:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+      QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
 
@@ -137,19 +156,35 @@ jobs:
         working-directory: bulksms/windows
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
+          python -m pip install -r requirements.txt pyinstaller 2>&1 | Tee-Object -FilePath install.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Smoke-test core rules (no GUI)
         working-directory: bulksms/windows
-        run: python tools/selftest.py
+        run: |
+          python tools/selftest.py *>&1 | Tee-Object -FilePath selftest.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Smoke-test GUI (offscreen) + screenshots
         working-directory: bulksms/windows
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: python tools/gui_smoke.py gui-preview
+        run: |
+          python tools/gui_smoke.py gui-preview *>&1 | Tee-Object -FilePath gui-smoke.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Report Windows errors
+        if: failure()
+        run: |
+          Get-ChildItem -Filter *.log | ForEach-Object {
+            Write-Output "----- $($_.Name) (آخرین خطوط) -----"
+            Get-Content $_.FullName -Tail 30
+          }
+          Get-ChildItem -Filter *.log | Get-Content |
+            Select-String -Pattern "Traceback|ModuleNotFoundError|ImportError|SyntaxError|UnicodeEncodeError|Error:|FAIL " |
+            Select-Object -First 20 |
+            ForEach-Object { Write-Output "::error::$($_.Line.Trim())" }
 
       - name: Upload GUI screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: payamresan-gui-preview
@@ -159,16 +194,17 @@ jobs:
 
       - name: Build EXE
         working-directory: bulksms/windows
-        run: >
-          pyinstaller --noconfirm --clean --onefile --windowed
-          --name PayamResan-Setup
-          --add-data "payamresan/icon.png;payamresan"
-          --exclude-module tkinter
-          --exclude-module PySide6.QtWebEngineCore
-          PayamResan.py
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed `
+            --name PayamResan-Setup `
+            --add-data "payamresan/icon.png;payamresan" `
+            --exclude-module tkinter `
+            --exclude-module PySide6.QtWebEngineCore `
+            PayamResan.py *>&1 | Tee-Object -FilePath exe-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package
-        shell: pwsh
+        if: success()
         working-directory: bulksms/windows
         run: |
           New-Item -ItemType Directory -Force -Path ..\..\out | Out-Null
@@ -179,6 +215,7 @@ jobs:
           Get-ChildItem ..\..\out
 
       - name: Upload EXE
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: payamresan-windows-exe
