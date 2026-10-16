@@ -214,8 +214,10 @@ jobs:
         working-directory: bulksms/windows
         run: |
           New-Item -ItemType Directory -Force -Path ..\..\out | Out-Null
-          Copy-Item dist\PayamResan-Setup.exe ..\..\out\
-          Copy-Item run.bat,README.md ..\..\out\
+          Copy-Item dist\PayamResan-Setup.exe ..\..\out\ -Force
+          foreach ($f in @("run.bat", "README.md", "requirements.txt")) {
+            if (Test-Path $f) { Copy-Item $f ..\..\out\ -Force }
+          }
           Get-FileHash ..\..\out\PayamResan-Setup.exe -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash)  PayamResan-Setup.exe" } | Set-Content ..\..\out\SHA256SUMS-exe.txt
           Get-ChildItem ..\..\out
