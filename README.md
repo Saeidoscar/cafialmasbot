@@ -26,6 +26,26 @@ A production-ready, decoupled system for automating **Iranian government portal 
 └─────────────────────────────────────┘       └────────────────────────┘
 ```
 
+## Related tooling in this repository
+
+### `bulksms/` — PayamResan bulk-SMS toolkit (Android APK + Windows EXE)
+
+A separate, self-contained toolkit for personal bulk SMS through your own SIM card:
+an Android app (Kotlin) that reads a contact CSV and sends via `SmsManager` under a daily
+cap, and a Windows desktop app (PySide6 → single EXE) that validates the same CSV, builds
+the message template and drives the phone over a token-protected LAN bridge.
+
+Both artifacts are built by the [Build PayamResan workflow](.github/workflows/build-payamresan.yml)
+and published as run artifacts (`payamresan-android-apk`, `payamresan-windows-exe`).
+
+- Manual (فارسی): [`bulksms/README.md`](bulksms/README.md)
+- CSV contract & column rules: [`bulksms/docs/CSV_RULES.md`](bulksms/docs/CSV_RULES.md)
+- Install & troubleshoot: [`bulksms/docs/INSTALL.md`](bulksms/docs/INSTALL.md)
+- Operator limits & legality: [`bulksms/docs/LIMITS_AND_LAW.md`](bulksms/docs/LIMITS_AND_LAW.md)
+- Ready-made prompt for AI agents that generate CSVs: [`bulksms/docs/AGENT_PROMPT.md`](bulksms/docs/AGENT_PROMPT.md)
+
+---
+
 ## Features
 
 - **9 Government Services** — SANA, GICA, MYGOV, TAX, INSURANCE, MOJAVEZ, AMLAK, KHODNEWIS, SAMAN
