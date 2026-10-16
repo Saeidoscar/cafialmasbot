@@ -118,8 +118,10 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Save signing key if newly created
-        if: success() && steps.keycache.outputs.cache-hit != 'true'
+      # همیشه کلید امضا آپلود می‌شود تا بتوانید آن را در Secrets ثبت کنید و امضای
+      # نسخه‌های بعدی ثابت بماند (به‌روزرسانی بدون حذف نسخهٔ قبلی).
+      - name: Save signing key
+        if: success()
         run: |
           mkdir -p out-key
           cp .signing/payamresan.p12 out-key/ 2>/dev/null || true
@@ -129,7 +131,7 @@ jobs:
           ls -la out-key
 
       - name: Upload signing key
-        if: success() && steps.keycache.outputs.cache-hit != 'true'
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: payamresan-signing-key
