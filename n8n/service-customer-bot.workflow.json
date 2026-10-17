@@ -1,0 +1,159 @@
+{
+  "name": "Cafialmas — 1. Service-End Bot (Customer Multi-Service & Slot Booking)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🛎 Cafialmas Service-End Bot (Customer Bot)\nHandles customer interactions across all 9 Iranian Government & Internet Cafe services:\n- `SANA`, `GICA`, `MYGOV`, `TAX`, `INSURANCE`, `MOJAVEZ`, `AMLAK`, `KHODNEWIS`, `SAMAN`\n- Interactive Category Menu & Manager Time-Slot Booking\n- Hybrid AI / Deterministic Slot-Filling\n- Live Order Status & Result Delivery",
+        "height": 220,
+        "width": 520
+      },
+      "id": "sticky-service-1",
+      "name": "Architecture Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 80]
+    },
+    {
+      "parameters": {
+        "updates": ["message", "callback_query"]
+      },
+      "id": "tg-trigger-service",
+      "name": "Customer Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 360],
+      "webhookId": "cafialmas-service-bot-webhook"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "WORKER_API_URL",
+              "value": "={{ $env.CAFIALMAS_API_URL || 'http://localhost:3000' }}"
+            },
+            {
+              "name": "AGENT_API_KEY",
+              "value": "={{ $env.AGENT_API_KEY || 'dev-agent-key-cafialmas-2026' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-config-service",
+      "name": "Bot Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [420, 360]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst msg = body.message;\nconst cq = body.callback_query;\n\nlet route = 'serverless_passthrough';\nif (msg?.text) {\n  const t = msg.text.trim().toLowerCase();\n  if (t === '/services') route = 'list_services';\n  else if (t === '/slots') route = 'list_slots';\n}\nreturn [{ json: { ...body, route } }];"
+      },
+      "id": "code-classify-update",
+      "name": "Classify Customer Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 360]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.route }}",
+        "rules": {
+          "rules": [
+            { "value2": "list_services", "output": 0 },
+            { "value2": "list_slots", "output": 1 },
+            { "value2": "serverless_passthrough", "output": 2 }
+          ]
+        }
+      },
+      "id": "switch-customer-route",
+      "name": "Route Customer Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [860, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node['Bot Config'].json.WORKER_API_URL }}/api/n8n/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $node['Bot Config'].json.AGENT_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\": \"list_services\"}"
+      },
+      "id": "http-list-services",
+      "name": "Fetch 9 Services Catalog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node['Bot Config'].json.WORKER_API_URL }}/api/n8n/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $node['Bot Config'].json.AGENT_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"action\": \"list_open_slots\", \"service_type\": \"ALL\"}"
+      },
+      "id": "http-list-slots",
+      "name": "Fetch Manager Open Slots",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node['Bot Config'].json.WORKER_API_URL }}/webhook/service",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "http-forward-service-webhook",
+      "name": "Forward to Serverless FSM & AI Engine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 520]
+    }
+  ],
+  "connections": {
+    "Customer Telegram Trigger": {
+      "main": [[{ "node": "Bot Config", "type": "main", "index": 0 }]]
+    },
+    "Bot Config": {
+      "main": [[{ "node": "Classify Customer Update", "type": "main", "index": 0 }]]
+    },
+    "Classify Customer Update": {
+      "main": [[{ "node": "Route Customer Intent", "type": "main", "index": 0 }]]
+    },
+    "Route Customer Intent": {
+      "main": [
+        [{ "node": "Fetch 9 Services Catalog", "type": "main", "index": 0 }],
+        [{ "node": "Fetch Manager Open Slots", "type": "main", "index": 0 }],
+        [{ "node": "Forward to Serverless FSM & AI Engine", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

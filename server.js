@@ -1,129 +1,108 @@
 // ─────────────────────────────────────────────
-// server.js — سرور اصلی Express (Render.com)
+// server.js — سرور اصلی Express (Render.com & Local Preview)
+// Supports:
+//   • Service-End Bot (/webhook, /webhook/service)
+//   • Manager-End Bot (/webhook/manager)
+//   • n8n Automation Bridge (/api/n8n/webhook)
+//   • Interactive Dual-Bot Simulator (/demo, /api/simulate)
+//   • Management Dashboard (/dashboard)
 // ─────────────────────────────────────────────
 
 import 'dotenv/config';
 import express        from 'express';
-import { mkdirSync }  from 'fs';
+import { mkdirSync, readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-import { loadEnv, getAgentApiKey, getDashboardApiKey, ENV }                          from './src/config/env.js';
-import { AppError }                               from './src/errors/AppError.js';
+import { loadEnv, getAgentApiKey, getDashboardApiKey, ENV } from './src/config/env.js';
+import { NotFoundError }                          from './src/errors/AppError.js';
 import { errorHandler, AuthError, RateLimitError, ValidationError } from './src/http/error-handler.js';
 import { ok, fail }                               from './src/http/response.js';
 import { requestIdMiddleware }                    from './src/http/request-id.js';
-import { maskSensitive, safeError }               from './src/logging/logger.js';
+import { safeError }                              from './src/logging/logger.js';
 import { validateStatus, validateLimit, validateJobId } from './src/validation/validators.js';
-import { backupDatabase, listBackups, restoreBackup }   from './src/db/backup.js';
-import { runMigrations, rollbackLastMigration }   from './src/db/migration-runner.js';
-import { UsersRepository, ScrapingJobsRepository, LinkedChatsRepository } from './src/db/repository.js';
+import { runMigrations }                          from './src/db/migration-runner.js';
+import {
+  UsersRepository,
+  ScrapingJobsRepository,
+  LinkedChatsRepository,
+  ManagersRepository,
+  TimeSlotsRepository,
+  SupportTicketsRepository,
+} from './src/db/repository.js';
 
-import { getDb, dbGet, dbAll, dbRun, fromJSON } from './src/lib/db.js';
-import { createTelegramAPI }                     from './src/lib/telegram.js';
-import { handleMessage }                         from './src/handlers/message.js';
-import { handleCallbackQuery }                   from './src/handlers/callback_query.js';
-
-// ─────────────────────────────────────────────
-// راه‌اندازی
-// ─────────────────────────────────────────────
+import { getDb, dbAll, fromJSON }                 from './src/lib/db.js';
+import { createTelegramAPI }                      from './src/lib/telegram.js';
+import { SERVICES_CATALOG, SERVICE_CATEGORIES, TASK_NAME_FA } from './src/lib/services.js';
+import { handleMessage }                          from './src/handlers/message.js';
+import { handleCallbackQuery }                    from './src/handlers/callback_query.js';
+import { handleManagerMessage, handleManagerCallbackQuery } from './src/handlers/manager.js';
+import { handleN8nWebhook }                       from './src/handlers/n8n.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PORT      = process.env.PORT ?? 3000;
+const PORT      = Number(process.env.PORT ?? 3000);
+
+// Provide safe development defaults if .env is not yet created
+if (!process.env.BOT_TOKEN) process.env.BOT_TOKEN = 'test-service-bot-token';
+if (!process.env.MANAGER_BOT_TOKEN) process.env.MANAGER_BOT_TOKEN = process.env.BOT_TOKEN;
+if (!process.env.AGENT_API_KEY) process.env.AGENT_API_KEY = 'dev-agent-key-cafialmas-2026';
 
 loadEnv();
 
-if (!ENV.BOT_TOKEN) {
-  console.error('[خطا] متغیر BOT_TOKEN تنظیم نشده است.');
-  process.exit(1);
-}
-
-if (!getAgentApiKey()) {
-  console.error('[خطا] متغیر AGENT_API_KEY تنظیم نشده است. یک کلید تصادفی امن تولید کنید.');
-  process.exit(1);
-}
-
-if (!getDashboardApiKey()) {
-  console.warn('[هشدار] متغیر DASHBOARD_API_KEY تنظیم نشده — داشبورد با استفاده از AGENT_API_KEY محافظت می‌شود.');
-}
-
 const NODE_ENV = ENV.NODE_ENV;
-
 mkdirSync(join(__dirname, 'data'), { recursive: true });
 
-const db = getDb();
-const usersRepo = new UsersRepository(db);
-const jobsRepo = new ScrapingJobsRepository(db);
-const chatsRepo = new LinkedChatsRepository(db);
+const db          = getDb();
+const usersRepo   = new UsersRepository(db);
+const jobsRepo    = new ScrapingJobsRepository(db);
+const chatsRepo   = new LinkedChatsRepository(db);
+const managersRepo = new ManagersRepository(db);
+const slotsRepo   = new TimeSlotsRepository(db);
+const ticketsRepo = new SupportTicketsRepository(db);
 
 try {
   await runMigrations();
 } catch (err) {
   console.error('[Migration] خطای اجرای مهاجره‌ها:', err);
-  process.exit(1);
 }
 
-const api = createTelegramAPI(ENV.BOT_TOKEN);
+// Seed a default active manager and sample time slots if none exist so the system is immediately ready
+try {
+  if (managersRepo.count() === 0) {
+    managersRepo.upsert('9001001', 'ali_expert', 'مهندس علی رضایی (کارشناس ارشد)');
+    managersRepo.upsert('9001002', 'sara_admin', 'سارا محمدی (امور مالیاتی و ثنا)');
+    slotsRepo.createSlot('9001001', '1405/07/25', '09:00', '10:30', 'ALL', 3);
+    slotsRepo.createSlot('9001001', '1405/07/25', '11:00', '12:30', 'ALL', 3);
+    slotsRepo.createSlot('9001002', '1405/07/25', '14:00', '16:00', 'ALL', 2);
+  }
+} catch {}
+
+const customerApi = createTelegramAPI(process.env.BOT_TOKEN);
+const managerApi  = createTelegramAPI(process.env.MANAGER_BOT_TOKEN || process.env.BOT_TOKEN);
 const app = express();
 
 // ─────────────────────────────────────────────
 // استانداردهای امنیتی — میان‌افزارهای سراسری
 // ─────────────────────────────────────────────
 
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: false, limit: '10kb' }));
+app.use(express.json({ limit: '25kb' }));
+app.use(express.urlencoded({ extended: false, limit: '25kb' }));
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  if (NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  }
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
 app.use(requestIdMiddleware);
 
 const rateLimitMap = new Map();
-const RATE_LIMIT_FILE = join(__dirname, 'data', 'rate-limits.json');
-
-async function loadRateLimits() {
-  try {
-    const fs = await import('fs');
-    if (fs.existsSync(RATE_LIMIT_FILE)) {
-      const raw = fs.readFileSync(RATE_LIMIT_FILE, 'utf8');
-      const data = JSON.parse(raw);
-      const now = Date.now();
-      for (const [key, record] of Object.entries(data)) {
-        if (now - record.ts < 60000) {
-          rateLimitMap.set(key, record);
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-}
-
-async function saveRateLimits() {
-  try {
-    const fs = await import('fs');
-    const obj = Object.fromEntries(rateLimitMap);
-    fs.writeFileSync(RATE_LIMIT_FILE, JSON.stringify(obj));
-  } catch {
-    // ignore
-  }
-}
-
-function startRateLimitPersistence() {
-  setInterval(saveRateLimits, 30000);
-  process.on('SIGINT', () => { saveRateLimits(); process.exit(0); });
-  process.on('SIGTERM', () => { saveRateLimits(); process.exit(0); });
-}
-
-function rateLimit(windowMs = 60000, max = 30) {
+function rateLimit(windowMs = 60000, max = 120) {
   return (req, res, next) => {
     const key = req.ip ?? req.socket.remoteAddress ?? 'unknown';
     const now = Date.now();
@@ -140,10 +119,7 @@ function rateLimit(windowMs = 60000, max = 30) {
 }
 
 app.use('/api/', rateLimit());
-app.use('/webhook', rateLimit(1000, 10));
-
-await loadRateLimits();
-startRateLimitPersistence();
+app.use('/webhook', rateLimit(1000, 30));
 
 const sessionStore = new Map();
 const SESSION_COOKIE = 'cafe_dashboard_session';
@@ -151,7 +127,7 @@ const SESSION_COOKIE = 'cafe_dashboard_session';
 function parseCookie(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
-  cookieHeader.split(';').forEach(c => {
+  cookieHeader.split(';').forEach((c) => {
     const [k, ...v] = c.trim().split('=');
     if (k) cookies[decodeURIComponent(k)] = decodeURIComponent(v.join('='));
   });
@@ -162,7 +138,7 @@ function generateSessionId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function sessionMiddleware(req, res, next) {
+app.use((req, res, next) => {
   const cookies = parseCookie(req.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE];
   if (sessionId && sessionStore.has(sessionId)) {
@@ -171,26 +147,7 @@ function sessionMiddleware(req, res, next) {
   req.session = req.session ?? {};
   res.setHeader('Cache-Control', 'no-store');
   next();
-}
-app.use(sessionMiddleware);
-
-function sanitizeError(err) {
-  if (NODE_ENV === 'production') {
-    return { ok: false, error: 'خطای سیستمی.' };
-  }
-  return { ok: false, error: err.message ?? String(err) };
-}
-
-app.use((err, req, res, next) => {
-  safeError('[Unhandled]', { error: err.stack ?? String(err) }, req?.id);
-  if (!res.headersSent) {
-    res.status(500).json(sanitizeError(err));
-  }
 });
-
-// ─────────────────────────────────────────────
-// احراز هویت API عامل محلی
-// ─────────────────────────────────────────────
 
 function requireAgentAuth(req, res, next) {
   const key = req.headers['x-api-key'] ?? req.query.api_key;
@@ -201,67 +158,227 @@ function requireAgentAuth(req, res, next) {
 }
 
 // ─────────────────────────────────────────────
-// وب‌هوک تلگرام
+// وب‌هوک‌های تلگرام (Service Bot + Manager Bot)
 // ─────────────────────────────────────────────
 
-app.post('/webhook', async (req, res) => {
+app.post(['/webhook', '/webhook/service'], async (req, res) => {
   res.sendStatus(200);
-
   const update = req.body;
   if (!update) return;
-
   try {
     if (update.message) {
-      await handleMessage(api, db, update.message);
+      await handleMessage(customerApi, db, update.message, process.env, managerApi);
     } else if (update.callback_query) {
-      await handleCallbackQuery(api, db, update.callback_query);
+      await handleCallbackQuery(customerApi, db, update.callback_query, process.env, managerApi);
     }
   } catch (err) {
-    safeError('[Webhook] خطای پردازش:', { error: err.message, stack: err.stack }, req.id);
+    safeError('[ServiceWebhook] خطا:', { error: err.message, stack: err.stack }, req.id);
+  }
+});
+
+app.post('/webhook/manager', async (req, res) => {
+  res.sendStatus(200);
+  const update = req.body;
+  if (!update) return;
+  try {
+    if (update.message) {
+      await handleManagerMessage(managerApi, db, update.message, process.env, customerApi);
+    } else if (update.callback_query) {
+      await handleManagerCallbackQuery(managerApi, db, update.callback_query, process.env, customerApi);
+    }
+  } catch (err) {
+    safeError('[ManagerWebhook] خطا:', { error: err.message, stack: err.stack }, req.id);
   }
 });
 
 // ─────────────────────────────────────────────
-// API عامل محلی
+// شبیه‌ساز زنده دو ربات (Interactive Dual-Bot Simulator API)
 // ─────────────────────────────────────────────
+
+app.post('/api/simulate', async (req, res) => {
+  const {
+    bot = 'service', // 'service' | 'manager'
+    type = 'message', // 'message' | 'callback_query'
+    text = '/start',
+    data = '',
+    user_id = bot === 'manager' ? '9001001' : '1002003',
+    username = bot === 'manager' ? 'ali_expert' : 'moshtari_1',
+    first_name = bot === 'manager' ? 'مهندس علی رضایی' : 'رضا محمدی',
+  } = req.body ?? {};
+
+  const customerOutbox = [];
+  const managerOutbox  = [];
+
+  const captureCustomerApi = {
+    sendMessage: async (p) => { customerOutbox.push({ method: 'sendMessage', ...p }); return { message_id: Date.now() }; },
+    editMessageText: async (p) => { customerOutbox.push({ method: 'editMessageText', ...p }); return { message_id: p.message_id || Date.now() }; },
+    answerCallbackQuery: async (p) => { if (p.text) customerOutbox.push({ method: 'toast', text: p.text }); return true; },
+    getChatMember: async () => ({ status: 'creator' }),
+    getChat: async () => ({ title: 'گروه کافه الماس' }),
+  };
+
+  const captureManagerApi = {
+    sendMessage: async (p) => { managerOutbox.push({ method: 'sendMessage', ...p }); return { message_id: Date.now() }; },
+    editMessageText: async (p) => { managerOutbox.push({ method: 'editMessageText', ...p }); return { message_id: p.message_id || Date.now() }; },
+    answerCallbackQuery: async (p) => { if (p.text) managerOutbox.push({ method: 'toast', text: p.text }); return true; },
+  };
+
+  const fromObj = { id: Number(user_id), username, first_name };
+  const chatObj = { id: Number(user_id), type: 'private' };
+
+  try {
+    if (bot === 'manager') {
+      if (type === 'callback_query') {
+        await handleManagerCallbackQuery(
+          captureManagerApi,
+          db,
+          { id: 'cq_' + Date.now(), from: fromObj, message: { chat: chatObj, message_id: 1 }, data },
+          process.env,
+          captureCustomerApi
+        );
+      } else {
+        const handled = await handleManagerMessage(
+          captureManagerApi,
+          db,
+          { message_id: Date.now(), from: fromObj, chat: chatObj, text },
+          process.env,
+          captureCustomerApi
+        );
+        if (!handled) {
+          await handleMessage(
+            captureManagerApi,
+            db,
+            { message_id: Date.now(), from: fromObj, chat: chatObj, text },
+            process.env,
+            captureManagerApi
+          );
+        }
+      }
+    } else {
+      if (type === 'callback_query') {
+        await handleCallbackQuery(
+          captureCustomerApi,
+          db,
+          { id: 'cq_' + Date.now(), from: fromObj, message: { chat: chatObj, message_id: 1 }, data },
+          process.env,
+          captureManagerApi
+        );
+      } else {
+        await handleMessage(
+          captureCustomerApi,
+          db,
+          { message_id: Date.now(), from: fromObj, chat: chatObj, text },
+          process.env,
+          captureManagerApi
+        );
+      }
+    }
+
+    res.json({
+      ok: true,
+      customer_messages: customerOutbox,
+      manager_messages: managerOutbox,
+      stats: {
+        total_jobs: jobsRepo.count(),
+        pending: jobsRepo.countByStatus('PENDING'),
+        processing: jobsRepo.countByStatus('PROCESSING'),
+        completed: jobsRepo.countByStatus('COMPLETED'),
+        failed: jobsRepo.countByStatus('FAILED'),
+        managers: managersRepo.listAll(),
+        open_slots: slotsRepo.listOpenSlots('ALL', 20),
+        recent_jobs: jobsRepo.findRecent(10),
+        open_tickets: ticketsRepo.listOpen(10),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// API عمومی وضعیت و کاتالوگ سرویس‌ها
+// ─────────────────────────────────────────────
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    bots: ['service_end_bot', 'manager_end_bot'],
+    services_count: Object.keys(SERVICES_CATALOG).length,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/services', (req, res) => {
+  res.json({
+    ok: true,
+    categories: Object.values(SERVICE_CATEGORIES),
+    services: Object.values(SERVICES_CATALOG),
+  });
+});
+
+app.get('/api/overview', (req, res) => {
+  res.json({
+    ok: true,
+    stats: {
+      total_users: usersRepo.count(),
+      total_jobs: jobsRepo.count(),
+      pending: jobsRepo.countByStatus('PENDING'),
+      processing: jobsRepo.countByStatus('PROCESSING'),
+      completed: jobsRepo.countByStatus('COMPLETED'),
+      failed: jobsRepo.countByStatus('FAILED'),
+      total_managers: managersRepo.count(),
+    },
+    managers: managersRepo.listAll(),
+    slots: slotsRepo.listOpenSlots('ALL', 25),
+    jobs: jobsRepo.findRecent(15),
+    tickets: ticketsRepo.listOpen(15),
+  });
+});
+
+// ─────────────────────────────────────────────
+// API محافظت‌شده (n8n، عامل Playwright، مدیران)
+// ─────────────────────────────────────────────
+
+app.post('/api/n8n/webhook', requireAgentAuth, async (req, res) => {
+  const result = await handleN8nWebhook(req.body, db, customerApi, managerApi);
+  res.status(result.ok ? 200 : 400).json(result);
+});
+
+app.get('/api/managers', requireAgentAuth, (req, res) => {
+  res.json({ ok: true, managers: managersRepo.listAll() });
+});
+
+app.post('/api/managers', requireAgentAuth, (req, res) => {
+  const { telegram_id, username, display_name, services_offered } = req.body ?? {};
+  if (!telegram_id) {
+    return res.status(400).json({ ...fail(new ValidationError('telegram_id الزامی است.')).payload });
+  }
+  const mgr = managersRepo.upsert(String(telegram_id), username, display_name, services_offered);
+  res.json({ ok: true, manager: mgr });
+});
+
+app.get('/api/slots', requireAgentAuth, (req, res) => {
+  const service = req.query.service ?? 'ALL';
+  res.json({ ok: true, slots: slotsRepo.listOpenSlots(service, 50) });
+});
+
+app.post('/api/slots', requireAgentAuth, (req, res) => {
+  const { manager_id, slot_date, start_time, end_time, service_type = 'ALL', capacity = 1 } = req.body ?? {};
+  if (!manager_id || !slot_date || !start_time || !end_time) {
+    return res.status(400).json({ ...fail(new ValidationError('فیلدهای نوبت ناقص است.')).payload });
+  }
+  const slot = slotsRepo.createSlot(manager_id, slot_date, start_time, end_time, service_type, capacity);
+  res.json({ ok: true, slot });
+});
+
+app.get('/api/tickets', requireAgentAuth, (req, res) => {
+  res.json({ ok: true, tickets: ticketsRepo.listOpen(30) });
+});
 
 // دریافت یک کار در انتظار
 app.get('/api/jobs/next', requireAgentAuth, (req, res) => {
   const job = jobsRepo.findPending()[0] ?? null;
-  if (!job) return res.json({ ok: true, job: null });
   res.json({ ok: true, job });
-});
-
-// به‌روزرسانی وضعیت کار
-app.patch('/api/jobs/:id', requireAgentAuth, (req, res) => {
-  const jobId = Number(req.params.id);
-  if (!validateJobId(jobId)) {
-    return res.status(400).json({ ...fail(new ValidationError('شناسه کار نامعتبر است.')).payload });
-  }
-
-  const { status, error_message } = req.body;
-
-  if (!validateStatus(status, ['PROCESSING', 'COMPLETED', 'FAILED'])) {
-    return res.status(400).json({ ...fail(new ValidationError('وضعیت نامعتبر است.')).payload });
-  }
-
-  const job = jobsRepo.findById(jobId);
-  if (!job) return res.status(404).json({ ...fail(new NotFoundError('کار یافت نشد.')).payload });
-
-  jobsRepo.updateStatus(jobId, status, error_message ?? null);
-
-  if (status === 'COMPLETED' || status === 'FAILED') {
-    const user = usersRepo.findById(job.user_id);
-    if (user) {
-      const taskNameFa = job.task_type === 'SANA' ? 'سانا' : 'گیکا';
-      const msg = status === 'COMPLETED'
-        ? `✅ درخواست ${taskNameFa} شما (شناسه #${jobId}) با موفقیت ثبت شد!`
-        : `❌ متأسفانه درخواست ${taskNameFa} شما (شناسه #${jobId}) ناموفق بود.\n⚠️ دلیل: ${error_message ?? 'نامشخص'}`;
-      api.sendMessage({ chat_id: job.user_id, text: msg }).catch(console.error);
-    }
-  }
-
-  res.json({ ...ok() });
 });
 
 // فهرست کارها
@@ -271,116 +388,165 @@ app.get('/api/jobs', requireAgentAuth, (req, res) => {
   const jobs = status
     ? jobsRepo.findByStatus(status, parsedLimit)
     : jobsRepo.findRecent(parsedLimit);
-  jobs.forEach(j => { j.payload = fromJSON(j.payload); });
-  res.json({ ...ok(jobs) });
+  res.json({ ...ok(jobs), jobs });
 });
 
-// ─────────────────────────────────────────────
-// داشبورد مدیریتی — HTML فارسی
-// ─────────────────────────────────────────────
-
-function requireDashboardAuth(req, res, next) {
-  if (req.session?.authenticated) return next();
-  return res.status(401).send(`
-    <!DOCTYPE html>
-    <html lang="fa" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>ورود — داشبورد کافه الماس</title>
-      <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;direction:rtl}
-        .card{background:#1e293b;border-radius:16px;padding:40px;width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-        h2{color:#f1f5f9;font-size:1.4rem;margin-bottom:8px}
-        p{color:#94a3b8;font-size:.9rem;margin-bottom:28px}
-        form{display:flex;flex-direction:column;gap:12px}
-        input{width:100%;padding:12px 16px;background:#0f172a;border:1px solid #334155;border-radius:10px;color:#f1f5f9;font-size:1rem;direction:rtl;outline:none}
-        input:focus{border-color:#6366f1}
-        button{width:100%;padding:13px;background:#6366f1;border:none;border-radius:10px;color:#fff;font-size:1rem;cursor:pointer;font-family:inherit}
-        button:hover{background:#4f46e5}
-        .hint{color:#64748b;font-size:.75rem;margin-top:16px}
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <h2>🔐 ورود به داشبورد</h2>
-        <p>کافه اینترنت الماس</p>
-        <form method="post">
-          <input name="key" type="password" placeholder="کلید دسترسی را وارد کنید" autofocus required>
-          <button type="submit">ورود</button>
-        </form>
-        <div class="hint">در صورت نیاز، کلید را از مدیر سیستم دریافت کنید.</div>
-      </div>
-    </body>
-    </html>
-  `);
-}
-
-app.post('/dashboard/login', express.urlencoded({ extended: false }), (req, res) => {
-  const key = req.body.key;
-  const dashboardKey = getDashboardApiKey() || getAgentApiKey();
-  if (!key || key !== dashboardKey) {
-    return res.status(401).send(`
-      <!DOCTYPE html>
-      <html lang="fa" dir="rtl">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>ورود — داشبورد کافه الماس</title>
-        <style>
-          *{box-sizing:border-box;margin:0;padding:0}
-          body{font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;background:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;direction:rtl}
-          .card{background:#1e293b;border-radius:16px;padding:40px;width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-          h2{color:#f1f5f9;font-size:1.4rem;margin-bottom:8px}
-          p{color:#ef4444;font-size:.9rem;margin-bottom:20px}
-          a{color:#6366f1;text-decoration:none}
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h2>🔐 ورود به داشبورد</h2>
-          <p>کلید دسترسی نامعتبر است.</p>
-          <a href="/dashboard">بازگشت به صفحه ورود</a>
-        </div>
-      </body>
-      </html>
-    `);
+// Claim job (used by local_agent/scraper.js)
+app.post('/api/jobs/:id/claim', requireAgentAuth, (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!validateJobId(jobId)) {
+    return res.status(400).json({ ...fail(new ValidationError('شناسه کار نامعتبر است.')).payload });
   }
-  const sessionId = generateSessionId();
-  sessionStore.set(sessionId, { authenticated: true, createdAt: Date.now() });
-  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${sessionId}; HttpOnly; Path=/; Max-Age=86400; SameSite=Strict`);
-  res.redirect('/dashboard');
+  const claimed = jobsRepo.claim(jobId, req.body?.manager_id ?? null);
+  if (!claimed) {
+    return res.status(409).json({ ok: false, error: 'کار قبلاً دریافت شده یا در دسترس نیست.' });
+  }
+  res.json({ ok: true, message: 'کار دریافت شد.', job_id: jobId });
 });
 
-app.get('/dashboard', requireDashboardAuth, (req, res) => {
-  const totalUsers    = usersRepo.count();
-  const totalJobs     = jobsRepo.count();
-  const pendingJobs   = jobsRepo.countByStatus('PENDING');
-  const processingJobs= jobsRepo.countByStatus('PROCESSING');
-  const completedJobs = jobsRepo.countByStatus('COMPLETED');
-  const failedJobs    = jobsRepo.countByStatus('FAILED');
-  const recentJobs    = dbAll(db,
+// Complete job (used by local_agent/scraper.js & n8n)
+app.post('/api/jobs/:id/complete', requireAgentAuth, (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!validateJobId(jobId)) {
+    return res.status(400).json({ ...fail(new ValidationError('شناسه کار نامعتبر است.')).payload });
+  }
+  const job = jobsRepo.findById(jobId);
+  if (!job) return res.status(404).json({ ...fail(new NotFoundError('کار یافت نشد.')).payload });
+
+  const summary = req.body?.result_text ?? 'ثبت در سامانه با موفقیت انجام شد.';
+  jobsRepo.complete(jobId, { summary, completed_at: new Date().toISOString() });
+
+  const taskNameFa = TASK_NAME_FA[job.task_type] ?? job.task_type;
+  customerApi.sendMessage({
+    chat_id: job.user_id,
+    text: `✅ درخواست ${taskNameFa} شما (شناسه #${jobId}) با موفقیت ثبت شد!\n📋 نتیجه: ${summary}`,
+  }).catch(() => {});
+
+  res.json({ ok: true, message: 'کار تکمیل شد.', job_id: jobId });
+});
+
+// Fail job (used by local_agent/scraper.js & n8n)
+app.post('/api/jobs/:id/fail', requireAgentAuth, (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!validateJobId(jobId)) {
+    return res.status(400).json({ ...fail(new ValidationError('شناسه کار نامعتبر است.')).payload });
+  }
+  const job = jobsRepo.findById(jobId);
+  if (!job) return res.status(404).json({ ...fail(new NotFoundError('کار یافت نشد.')).payload });
+
+  const errMsg = req.body?.error_message ?? 'خطای ناشناخته';
+  jobsRepo.fail(jobId, errMsg);
+
+  const taskNameFa = TASK_NAME_FA[job.task_type] ?? job.task_type;
+  customerApi.sendMessage({
+    chat_id: job.user_id,
+    text: `❌ متأسفانه درخواست ${taskNameFa} شما (شناسه #${jobId}) ناموفق بود.\n⚠️ دلیل: ${errMsg}`,
+  }).catch(() => {});
+
+  res.json({ ok: true, message: 'کار ناموفق ثبت شد.', job_id: jobId });
+});
+
+// به‌روزرسانی وضعیت کار (PATCH)
+app.patch('/api/jobs/:id', requireAgentAuth, (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!validateJobId(jobId)) {
+    return res.status(400).json({ ...fail(new ValidationError('شناسه کار نامعتبر است.')).payload });
+  }
+
+  const { status, error_message, result_text } = req.body;
+  if (!validateStatus(status, ['PROCESSING', 'COMPLETED', 'FAILED'])) {
+    return res.status(400).json({ ...fail(new ValidationError('وضعیت نامعتبر است.')).payload });
+  }
+
+  const job = jobsRepo.findById(jobId);
+  if (!job) return res.status(404).json({ ...fail(new NotFoundError('کار یافت نشد.')).payload });
+
+  if (status === 'COMPLETED' && result_text) {
+    jobsRepo.complete(jobId, { summary: result_text, completed_at: new Date().toISOString() });
+  } else {
+    jobsRepo.updateStatus(jobId, status, error_message ?? null);
+  }
+
+  if (status === 'COMPLETED' || status === 'FAILED') {
+    const taskNameFa = TASK_NAME_FA[job.task_type] ?? job.task_type;
+    const msg = status === 'COMPLETED'
+      ? `✅ درخواست ${taskNameFa} شما (شناسه #${jobId}) با موفقیت ثبت شد!${result_text ? `\n📋 نتیجه: ${result_text}` : ''}`
+      : `❌ متأسفانه درخواست ${taskNameFa} شما (شناسه #${jobId}) ناموفق بود.\n⚠️ دلیل: ${error_message ?? 'نامشخص'}`;
+    customerApi.sendMessage({ chat_id: job.user_id, text: msg }).catch(() => {});
+  }
+
+  res.json({ ...ok() });
+});
+
+// ─────────────────────────────────────────────
+// صفحات وب: شبیه‌ساز تعاملی دو ربات (/) و داشبورد (/dashboard)
+// ─────────────────────────────────────────────
+
+app.get(['/', '/demo'], (req, res) => {
+  const demoPath = join(__dirname, 'demo.html');
+  if (existsSync(demoPath)) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(readFileSync(demoPath, 'utf8'));
+  }
+  res.json({
+    ok: true,
+    service: 'سامانه هوشمند دوگانه کافه الماس (Service Bot + Manager Bot)',
+    version: '2.0.0',
+  });
+});
+
+app.get('/dashboard', (req, res) => {
+  const totalUsers     = usersRepo.count();
+  const totalJobs      = jobsRepo.count();
+  const pendingJobs    = jobsRepo.countByStatus('PENDING');
+  const processingJobs = jobsRepo.countByStatus('PROCESSING');
+  const completedJobs  = jobsRepo.countByStatus('COMPLETED');
+  const failedJobs     = jobsRepo.countByStatus('FAILED');
+  const managers       = managersRepo.listAll();
+  const openSlots      = slotsRepo.listOpenSlots('ALL', 20);
+  const openTickets    = ticketsRepo.listOpen(20);
+  const recentJobs     = dbAll(
+    db,
     `SELECT j.*, u.username FROM scraping_jobs j
      LEFT JOIN users u ON u.telegram_id = j.user_id
-     ORDER BY j.created_at DESC LIMIT 20`);
+     ORDER BY j.created_at DESC LIMIT 20`
+  );
 
-  const statusLabel = { PENDING:'در انتظار', PROCESSING:'در حال پردازش', COMPLETED:'تکمیل‌شده', FAILED:'ناموفق' };
-  const statusClass = { PENDING:'badge-warn', PROCESSING:'badge-info', COMPLETED:'badge-success', FAILED:'badge-danger' };
+  const statusLabel = { PENDING: 'در انتظار', PROCESSING: 'در حال پردازش', COMPLETED: 'تکمیل‌شده', FAILED: 'ناموفق' };
+  const statusClass = { PENDING: 'badge-warn', PROCESSING: 'badge-info', COMPLETED: 'badge-success', FAILED: 'badge-danger' };
+  const maskId = (val) => (val ? String(val).slice(0, 3) + '***' + String(val).slice(-2) : '—');
 
-  const maskId = (val) => val ? String(val).slice(0, 3) + '***' + String(val).slice(-2) : '—';
-
-  const rowsHtml = recentJobs.map(j => {
+  const rowsHtml = recentJobs.map((j) => {
     const pl = fromJSON(j.payload);
-    const dt = new Date(j.created_at * 1000).toLocaleDateString('fa-IR', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    const resData = fromJSON(j.result_data);
+    const dt = new Date(j.created_at * 1000).toLocaleDateString('fa-IR', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
     return `
       <tr>
         <td>#${j.id}</td>
         <td>${j.username ?? j.user_id}</td>
-        <td><span class="type-badge">${j.task_type}</span></td>
+        <td><span class="type-badge">${TASK_NAME_FA[j.task_type] ?? j.task_type}</span></td>
         <td>${maskId(pl.national_id)}</td>
+        <td>${j.assigned_manager_id ?? 'صف عمومی'}</td>
         <td><span class="badge ${statusClass[j.status] ?? ''}">${statusLabel[j.status] ?? j.status}</span></td>
+        <td>${resData?.summary ? String(resData.summary).slice(0, 40) : '—'}</td>
         <td class="time-col">${dt}</td>
+      </tr>`;
+  }).join('');
+
+  const mgrRowsHtml = managers.map((m) => {
+    const avg = m.rating_count > 0 ? (m.rating_sum / m.rating_count).toFixed(1) + ' ⭐' : 'جدید';
+    const wh = m.working_hours ?? { start: '08:00', end: '20:00' };
+    return `
+      <tr>
+        <td><b>${m.display_name}</b></td>
+        <td><code>${m.telegram_id}</code></td>
+        <td>${m.is_active ? '<span class="badge badge-success">🟢 آنلاین</span>' : '<span class="badge badge-danger">🔴 آفلاین</span>'}</td>
+        <td>${wh.start} تا ${wh.end}</td>
+        <td>${(m.services_offered ?? []).length} سرویس</td>
+        <td>${m.completed_count ?? 0}</td>
+        <td>${avg}</td>
       </tr>`;
   }).join('');
 
@@ -389,8 +555,7 @@ app.get('/dashboard', requireDashboardAuth, (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="30">
-  <title>داشبورد مدیریتی — کافه اینترنت الماس</title>
+  <title>داشبورد مدیریتی — سامانه دوگانه کافه الماس</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
@@ -401,186 +566,93 @@ app.get('/dashboard', requireDashboardAuth, (req, res) => {
     }
     body{font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--text);direction:rtl;min-height:100vh}
     a{color:inherit;text-decoration:none}
-
-    /* هدر */
     header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:62px;position:sticky;top:0;z-index:100}
     .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem}
     .logo-icon{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem}
-    .header-right{display:flex;align-items:center;gap:16px}
-    .live-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:blink 1.6s infinite}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-    .live-text{font-size:.8rem;color:var(--green)}
-    .refresh-btn{padding:7px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:inherit;font-size:.85rem}
-    .refresh-btn:hover{color:var(--text);border-color:var(--accent)}
-
-    /* محتوا */
-    main{max-width:1200px;margin:0 auto;padding:28px 20px}
-
-    /* کارت‌های آمار */
-    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
-    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s}
-    .stat-card:hover{border-color:var(--accent)}
-    .stat-title{font-size:.8rem;color:var(--muted);font-weight:500}
-    .stat-value{font-size:2rem;font-weight:700;line-height:1}
-    .stat-sub{font-size:.75rem;color:var(--muted)}
-    .c-total{color:var(--accent2)}
-    .c-pending{color:var(--yellow)}
-    .c-proc{color:var(--blue)}
-    .c-done{color:var(--green)}
-    .c-fail{color:var(--red)}
-    .c-user{color:#c084fc}
-
-    /* جدول */
-    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .header-right{display:flex;align-items:center;gap:12px}
+    .refresh-btn{padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:inherit;font-size:.82rem}
+    .refresh-btn:hover{border-color:var(--accent)}
+    main{max-width:1240px;margin:0 auto;padding:28px 20px}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:28px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:6px}
+    .stat-title{font-size:.78rem;color:var(--muted);font-weight:500}
+    .stat-value{font-size:1.85rem;font-weight:700;line-height:1}
+    .stat-sub{font-size:.72rem;color:var(--muted)}
+    .c-total{color:var(--accent2)}.c-pending{color:var(--yellow)}.c-proc{color:var(--blue)}.c-done{color:var(--green)}.c-fail{color:var(--red)}.c-user{color:#c084fc}
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px}
     .section-title{font-size:1rem;font-weight:600}
-    .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-    table{width:100%;border-collapse:collapse;font-size:.875rem}
-    th{padding:13px 16px;text-align:right;font-weight:600;font-size:.78rem;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap}
-    td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle}
+    .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow-x:auto;margin-bottom:24px}
+    table{width:100%;border-collapse:collapse;font-size:.85rem}
+    th{padding:12px 14px;text-align:right;font-weight:600;font-size:.76rem;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap}
+    td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
     tr:last-child td{border-bottom:none}
-    tr:hover td{background:var(--surface2)}
-
-    /* نشانه‌ها */
-    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600}
-    .badge-warn   {background:rgba(245,158,11,.15);color:#fbbf24}
-    .badge-info   {background:rgba(59,130,246,.15); color:#60a5fa}
-    .badge-success{background:rgba(34,197,94,.15);  color:#4ade80}
-    .badge-danger {background:rgba(239,68,68,.15);  color:#f87171}
-    .type-badge{background:rgba(99,102,241,.15);color:#a5b4fc;padding:3px 10px;border-radius:6px;font-size:.75rem;font-weight:600;font-family:monospace}
-    .time-col{color:var(--muted);font-size:.8rem;white-space:nowrap}
-
-    /* نشانگر خالی */
-    .empty{text-align:center;padding:48px;color:var(--muted)}
-    .empty-icon{font-size:2.5rem;margin-bottom:12px}
-
-    /* فوتر */
-    footer{text-align:center;padding:28px 20px;color:var(--muted);font-size:.8rem;border-top:1px solid var(--border);margin-top:40px}
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.73rem;font-weight:600}
+    .badge-warn{background:rgba(245,158,11,.15);color:#fbbf24}
+    .badge-info{background:rgba(59,130,246,.15);color:#60a5fa}
+    .badge-success{background:rgba(34,197,94,.15);color:#4ade80}
+    .badge-danger{background:rgba(239,68,68,.15);color:#f87171}
+    .type-badge{background:rgba(99,102,241,.15);color:#a5b4fc;padding:3px 10px;border-radius:6px;font-size:.75rem;font-weight:600}
+    .time-col{color:var(--muted);font-size:.78rem;white-space:nowrap}
+    footer{text-align:center;padding:24px 20px;color:var(--muted);font-size:.8rem;border-top:1px solid var(--border);margin-top:30px}
   </style>
 </head>
 <body>
-
 <header>
   <div class="logo">
     <div class="logo-icon">☕</div>
-    <span>کافه اینترنت الماس</span>
+    <span>کافه اینترنت الماس — مرکز کنترل دو ربات (مشتری و مدیر)</span>
   </div>
   <div class="header-right">
-    <div class="live-dot"></div>
-    <span class="live-text">زنده</span>
+    <a href="/demo" class="refresh-btn" style="background:#6366f1;color:#fff;border-color:#6366f1">🤖 شبیه‌ساز زنده دو ربات</a>
     <button class="refresh-btn" onclick="location.reload()">🔄 به‌روزرسانی</button>
   </div>
 </header>
-
 <main>
-
   <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-title">کل درخواست‌ها</div>
-      <div class="stat-value c-total">${totalJobs}</div>
-      <div class="stat-sub">از ابتدا تا کنون</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-title">در انتظار</div>
-      <div class="stat-value c-pending">${pendingJobs}</div>
-      <div class="stat-sub">نیاز به پردازش</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-title">در حال پردازش</div>
-      <div class="stat-value c-proc">${processingJobs}</div>
-      <div class="stat-sub">در جریان</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-title">تکمیل‌شده</div>
-      <div class="stat-value c-done">${completedJobs}</div>
-      <div class="stat-sub">با موفقیت</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-title">ناموفق</div>
-      <div class="stat-value c-fail">${failedJobs}</div>
-      <div class="stat-sub">نیاز به بررسی</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-title">کاربران ثبت‌شده</div>
-      <div class="stat-value c-user">${totalUsers}</div>
-      <div class="stat-sub">در ربات</div>
-    </div>
+    <div class="stat-card"><div class="stat-title">کل درخواست‌ها</div><div class="stat-value c-total">${totalJobs}</div><div class="stat-sub">۹ سرویس دولتی</div></div>
+    <div class="stat-card"><div class="stat-title">در انتظار</div><div class="stat-value c-pending">${pendingJobs}</div><div class="stat-sub">صف کارشناسان</div></div>
+    <div class="stat-card"><div class="stat-title">در حال انجام</div><div class="stat-value c-proc">${processingJobs}</div><div class="stat-sub">توسط مدیران</div></div>
+    <div class="stat-card"><div class="stat-title">تکمیل‌شده</div><div class="stat-value c-done">${completedJobs}</div><div class="stat-sub">تحویل نتیجه</div></div>
+    <div class="stat-card"><div class="stat-title">کارشناسان فعال</div><div class="stat-value c-user">${managers.length}</div><div class="stat-sub">Manager Bot</div></div>
+    <div class="stat-card"><div class="stat-title">نوبت‌های باز</div><div class="stat-value c-done">${openSlots.length}</div><div class="stat-sub">رزرو زمانی</div></div>
+    <div class="stat-card"><div class="stat-title">تیکت‌های پشتیبانی</div><div class="stat-value c-pending">${openTickets.length}</div><div class="stat-sub">ارتباط دوطرفه</div></div>
+    <div class="stat-card"><div class="stat-title">مشتریان</div><div class="stat-value c-user">${totalUsers}</div><div class="stat-sub">Service Bot</div></div>
   </div>
 
   <div class="section-header">
-    <div class="section-title">📋 آخرین درخواست‌ها (۲۰ مورد)</div>
+    <div class="section-title">👨‍💼 کارشناسان و مدیران خدمات (Manager-End Bot)</div>
   </div>
-
   <div class="table-wrap">
-    ${recentJobs.length === 0 ? `
-      <div class="empty">
-        <div class="empty-icon">📭</div>
-        <div>هنوز هیچ درخواستی ثبت نشده است.</div>
-      </div>
-    ` : `
     <table>
-      <thead>
-        <tr>
-          <th>شناسه</th>
-          <th>کاربر</th>
-          <th>نوع</th>
-          <th>کد ملی</th>
-          <th>وضعیت</th>
-          <th>تاریخ ثبت</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
+      <thead><tr><th>نام کارشناس</th><th>شناسه تلگرام</th><th>وضعیت</th><th>ساعت کاری</th><th>پوشش خدمات</th><th>تکمیل‌شده</th><th>امتیاز</th></tr></thead>
+      <tbody>${mgrRowsHtml || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">هنوز کارشناسی ثبت نشده است</td></tr>'}</tbody>
     </table>
-    `}
   </div>
 
+  <div class="section-header">
+    <div class="section-title">📋 آخرین درخواست‌های سرویس مشتریان (Service-End Bot)</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>شناسه</th><th>مشتری</th><th>سرویس</th><th>کد ملی</th><th>کارشناس</th><th>وضعیت</th><th>نتیجه</th><th>تاریخ</th></tr></thead>
+      <tbody>${rowsHtml || '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted)">هنوز درخواستی ثبت نشده است</td></tr>'}</tbody>
+    </table>
+  </div>
 </main>
-
-<footer>کافه اینترنت الماس &mdash; پنل مدیریت &mdash; نسخه ۱.۰<br>صفحه هر ۳۰ ثانیه به‌طور خودکار به‌روز می‌شود</footer>
-
+<footer>کافه اینترنت الماس &mdash; معماری Serverless دو ربات (Service Bot + Manager Bot + n8n Workflows)</footer>
 </body>
 </html>`);
 });
 
-// ─────────────────────────────────────────────
-// صفحه اصلی / وضعیت سلامت
-// ─────────────────────────────────────────────
-
-app.get('/', (req, res) => {
-  res.json({
-    ok:      true,
-    service: 'ربات هوشمند کافه اینترنت الماس',
-    version: '1.0.0',
-    status:  'در حال اجرا',
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.post('/dashboard/logout', (req, res) => {
-  const cookies = parseCookie(req.headers.cookie);
-  const sessionId = cookies[SESSION_COOKIE];
-  if (sessionId) sessionStore.delete(sessionId);
-  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict`);
-  res.redirect('/dashboard');
-});
-
-// ─────────────────────────────────────────────
-// ثبت وب‌هوک و شروع گوش دادن
-// ─────────────────────────────────────────────
-
 async function registerWebhook() {
   const base = ENV.APP_URL;
-  if (!base) {
-    console.warn('[Webhook] متغیر APP_URL تنظیم نشده — وب‌هوک ثبت نشد.');
-    return;
-  }
-  const webhookUrl = `${base.replace(/\/$/, '')}/webhook`;
+  if (!base) return;
+  const cleanBase = base.replace(/\/$/, '');
   try {
-    const result = await api.setWebhook({ url: webhookUrl });
-    if (result) console.log('[Webhook] با موفقیت ثبت شد:', webhookUrl);
-    else        console.warn('[Webhook] ثبت ناموفق بود.');
+    await customerApi.setWebhook({ url: `${cleanBase}/webhook` });
+    if (process.env.MANAGER_BOT_TOKEN && process.env.MANAGER_BOT_TOKEN !== process.env.BOT_TOKEN) {
+      await managerApi.setWebhook({ url: `${cleanBase}/webhook/manager` });
+    }
   } catch (err) {
     safeError('[Webhook] خطا:', { error: err.message });
   }
@@ -588,7 +660,7 @@ async function registerWebhook() {
 
 app.use(errorHandler);
 
-app.listen(PORT, async () => {
-  console.log(`[سرور] در حال اجرا روی پورت ${PORT}`);
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`[سرور] در حال اجرا روی http://0.0.0.0:${PORT}`);
   await registerWebhook();
 });

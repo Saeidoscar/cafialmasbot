@@ -1,6 +1,8 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 
+process.env.DB_PATH = ':memory:';
+
 import { ok, fail } from './src/http/response.js';
 import { isValidTelegramId, sanitizeText, isValidJobId, validateStatus, validateLimit } from './src/validation/validators.js';
 import { maskSensitive, safeLog, safeError } from './src/logging/logger.js';
@@ -347,3 +349,237 @@ describe('Route Handling (unit)', () => {
     assert.strictEqual(res.payload.code, 'NOT_FOUND');
   });
 });
+
+describe('Multi-Service Catalog & Hybrid AI/Deterministic Slot-Filling', () => {
+  it('supports all 9 government & cafe services with required fields', async () => {
+    const { ALL_SERVICE_CODES, SERVICES_CATALOG, normalizeDigits } = await import('./src/lib/services.js');
+    const { getRequiredFields } = await import('./src/lib/ai.js');
+
+    assert.strictEqual(ALL_SERVICE_CODES.length, 9);
+    for (const code of ['SANA', 'GICA', 'MYGOV', 'TAX', 'INSURANCE', 'MOJAVEZ', 'AMLAK', 'KHODNEWIS', 'SAMAN']) {
+      assert.ok(SERVICES_CATALOG[code], `Service ${code} should exist in catalog`);
+      const fields = getRequiredFields(code);
+      assert.ok(fields.length >= 3, `Service ${code} should have at least 3 required fields`);
+    }
+    assert.strictEqual(normalizeDigits('۰۹۱۲۳۴۵۶۷۸۹'), '09123456789');
+  });
+
+  it('extracts and completes SANA fields deterministically with Persian digits', async () => {
+    const { processConversationDeterministic } = await import('./src/lib/ai.js');
+    let state = {};
+
+    const step1 = processConversationDeterministic('۰۰۱۲۳۴۵۶۷۸ ۱۳۷۰/۰۵/۱۵ ۰۹۱۲۳۴۵۶۷۸۹', state, 'SANA');
+    assert.strictEqual(step1.status, 'INCOMPLETE');
+    assert.strictEqual(step1.data.national_id, '0012345678');
+    assert.strictEqual(step1.data.birth_date, '1370/05/15');
+    assert.strictEqual(step1.data.mobile_number, '09123456789');
+
+    const step2 = processConversationDeterministic('ب123456', step1.data, 'SANA');
+    assert.strictEqual(step2.status, 'COMPLETE');
+    assert.strictEqual(step2.data.serial_number, 'ب123456');
+  });
+});
+
+describe('Dual-Bot Ecosystem: Service-End Bot + Manager-End Bot + n8n Webhook', () => {
+  let db;
+  let customerMessages = [];
+  let managerMessages = [];
+  let mockCustomerApi;
+  let mockManagerApi;
+
+  before(async () => {
+    process.env.DB_PATH = ':memory:';
+    const { getDb } = await import('./src/lib/db.js');
+    db = getDb();
+
+    mockCustomerApi = {
+      sendMessage: async (p) => { customerMessages.push(p); return { message_id: customerMessages.length }; },
+      editMessageText: async (p) => { customerMessages.push(p); return { message_id: customerMessages.length }; },
+      answerCallbackQuery: async () => true,
+      getChatMember: async () => ({ status: 'creator' }),
+      getChat: async () => ({ title: 'Test Group' }),
+    };
+
+    mockManagerApi = {
+      sendMessage: async (p) => { managerMessages.push(p); return { message_id: managerMessages.length }; },
+      editMessageText: async (p) => { managerMessages.push(p); return { message_id: managerMessages.length }; },
+      answerCallbackQuery: async () => true,
+    };
+  });
+
+  it('Manager Bot: registers manager, sets time slots, and toggles services', async () => {
+    const { handleManagerMessage, handleManagerCallbackQuery } = await import('./src/handlers/manager.js');
+    const { TimeSlotsRepository, ManagersRepository } = await import('./src/db/repository.js');
+
+    managerMessages = [];
+    await handleManagerMessage(
+      mockManagerApi,
+      db,
+      { from: { id: 777001, username: 'mgr_ali', first_name: 'علی' }, chat: { id: 777001 }, text: '/register_manager admin123' },
+      {},
+      mockCustomerApi
+    );
+    assert.ok(managerMessages.length >= 1);
+
+    await handleManagerMessage(
+      mockManagerApi,
+      db,
+      { from: { id: 777001, username: 'mgr_ali', first_name: 'علی' }, chat: { id: 777001 }, text: '/set_time 1405/07/28 09:00 11:00 2' },
+      {},
+      mockCustomerApi
+    );
+
+    const slotsRepo = new TimeSlotsRepository(db);
+    const openSlots = await slotsRepo.listOpenSlots('SANA');
+    assert.ok(openSlots.length >= 1);
+    assert.strictEqual(openSlots[0].start_time, '09:00');
+
+    const mgrRepo = new ManagersRepository(db);
+    await handleManagerCallbackQuery(
+      mockManagerApi,
+      db,
+      { id: 'cq1', from: { id: 777001, username: 'mgr_ali' }, message: { chat: { id: 777001 }, message_id: 1 }, data: 'MGR_TOGGLE_SVC:SAMAN' },
+      {},
+      mockCustomerApi
+    );
+    const mgr = await mgrRepo.findById('777001');
+    assert.ok(!mgr.services_offered.includes('SAMAN'));
+  });
+
+  it('Service Bot + Manager Bot: customer books slot, completes SANA, manager claims & delivers result, customer rates 5 stars', async () => {
+    const { handleMessage } = await import('./src/handlers/message.js');
+    const { handleCallbackQuery } = await import('./src/handlers/callback_query.js');
+    const { handleManagerCallbackQuery, handleManagerMessage } = await import('./src/handlers/manager.js');
+    const { TimeSlotsRepository, ScrapingJobsRepository, ManagersRepository } = await import('./src/db/repository.js');
+
+    const slotsRepo = new TimeSlotsRepository(db);
+    const jobsRepo  = new ScrapingJobsRepository(db);
+    const mgrRepo   = new ManagersRepository(db);
+
+    const slot = (await slotsRepo.listOpenSlots('SANA'))[0];
+    assert.ok(slot);
+
+    customerMessages = [];
+    managerMessages = [];
+
+    // Customer books the manager's slot for SANA
+    await handleCallbackQuery(
+      mockCustomerApi,
+      db,
+      {
+        id: 'cq_book',
+        from: { id: 888001, username: 'cust_sara', first_name: 'سارا' },
+        message: { chat: { id: 888001 }, message_id: 10 },
+        data: `BOOK_SLOT:${slot.id}:SANA`,
+      },
+      {},
+      mockManagerApi
+    );
+
+    // Customer submits required fields
+    await handleMessage(
+      mockCustomerApi,
+      db,
+      { from: { id: 888001, username: 'cust_sara', first_name: 'سارا' }, chat: { id: 888001 }, text: '0012345678 1375/02/10 09121112233' },
+      {},
+      mockManagerApi
+    );
+    await handleMessage(
+      mockCustomerApi,
+      db,
+      { from: { id: 888001, username: 'cust_sara', first_name: 'سارا' }, chat: { id: 888001 }, text: 'الف123456' },
+      {},
+      mockManagerApi
+    );
+
+    // Verify job was created, assigned to manager 777001, and manager was notified!
+    const userJobs = await jobsRepo.findByUser('888001');
+    assert.strictEqual(userJobs.length, 1);
+    const job = userJobs[0];
+    assert.strictEqual(job.task_type, 'SANA');
+    assert.strictEqual(job.assigned_manager_id, '777001');
+    assert.strictEqual(job.slot_id, slot.id);
+    assert.ok(managerMessages.some((m) => String(m.text).includes('درخواست سرویس جدید')));
+
+    // Manager claims the job
+    await handleManagerCallbackQuery(
+      mockManagerApi,
+      db,
+      { id: 'cq_claim', from: { id: 777001, username: 'mgr_ali' }, message: { chat: { id: 777001 }, message_id: 20 }, data: `MGR_CLAIM:${job.id}` },
+      {},
+      mockCustomerApi
+    );
+    assert.strictEqual((await jobsRepo.findById(job.id)).status, 'PROCESSING');
+
+    // Manager delivers the final result
+    await handleManagerMessage(
+      mockManagerApi,
+      db,
+      { from: { id: 777001, username: 'mgr_ali', first_name: 'علی' }, chat: { id: 777001 }, text: `/complete ${job.id} کد رهگیری ثنا: 55443322` },
+      {},
+      mockCustomerApi
+    );
+
+    const completedJob = await jobsRepo.findById(job.id);
+    assert.strictEqual(completedJob.status, 'COMPLETED');
+    assert.ok(completedJob.result_data.summary.includes('55443322'));
+    assert.ok(customerMessages.some((m) => String(m.text).includes('55443322')));
+
+    // Customer rates the completed job 5 stars
+    await handleCallbackQuery(
+      mockCustomerApi,
+      db,
+      {
+        id: 'cq_rate',
+        from: { id: 888001, username: 'cust_sara' },
+        message: { chat: { id: 888001 }, message_id: 30 },
+        data: `RATE_JOB:${job.id}:5`,
+      },
+      {},
+      mockManagerApi
+    );
+    const ratedJob = await jobsRepo.findById(job.id);
+    assert.strictEqual(ratedJob.rating, 5);
+    const updatedMgr = await mgrRepo.findById('777001');
+    assert.strictEqual(updatedMgr.rating_sum, 5);
+  });
+
+  it('n8n Webhook Bridge: handles list_services, set_manager_slots, create_service_job, complete_job', async () => {
+    const { handleN8nWebhook } = await import('./src/handlers/n8n.js');
+
+    const svcRes = await handleN8nWebhook({ action: 'list_services' }, db, mockCustomerApi, mockManagerApi);
+    assert.strictEqual(svcRes.ok, true);
+    assert.strictEqual(svcRes.services.length, 9);
+
+    const jobRes = await handleN8nWebhook(
+      {
+        action: 'create_service_job',
+        user_id: '888002',
+        username: 'n8n_user',
+        task_type: 'TAX',
+        payload: { national_id: '0011223344', birth_date: '1368/01/01' },
+      },
+      db,
+      mockCustomerApi,
+      mockManagerApi
+    );
+    assert.strictEqual(jobRes.ok, true);
+    assert.strictEqual(jobRes.job.task_type, 'TAX');
+
+    const doneRes = await handleN8nWebhook(
+      {
+        action: 'complete_job',
+        job_id: jobRes.job.id,
+        manager_id: '777001',
+        result_text: 'پرونده مالیاتی تایید شد',
+        tracking_code: 'TAX-998877',
+      },
+      db,
+      mockCustomerApi,
+      mockManagerApi
+    );
+    assert.strictEqual(doneRes.ok, true);
+    assert.strictEqual(doneRes.job.status, 'COMPLETED');
+  });
+});
+

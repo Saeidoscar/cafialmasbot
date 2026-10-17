@@ -1,0 +1,60 @@
+{
+  "name": "Cafialmas — 3. Two-Way Support Ticket Relay & Broadcast Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 💬 Two-Way Customer ↔ Manager Support Ticket Relay\nInspired by `Automations-Project/n8n-advanced-telegram-support-ticket-management-workflow` & `17sho/telegram-support-relay-bot`.\n- Automatically creates support tickets linked to customer service jobs\n- Relays customer messages to assigned Manager or Support Group Topic\n- Relays Manager replies straight back to Customer on the Service-End Bot",
+        "height": 210,
+        "width": 560
+      },
+      "id": "sticky-support-1",
+      "name": "Support Relay Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 80]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cafialmas-support-relay",
+        "responseMode": "lastNode"
+      },
+      "id": "webhook-support-trigger",
+      "name": "Support Ticket Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [220, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.CAFIALMAS_API_URL || 'http://localhost:3000') }}/api/n8n/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $env.AGENT_API_KEY || 'dev-agent-key-cafialmas-2026' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'reply_support_ticket', ticket_id: $json.ticket_id, manager_id: $json.manager_id, text: $json.text }) }}"
+      },
+      "id": "http-relay-reply",
+      "name": "Relay Reply via Serverless API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [540, 340]
+    }
+  ],
+  "connections": {
+    "Support Ticket Webhook": {
+      "main": [[{ "node": "Relay Reply via Serverless API", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

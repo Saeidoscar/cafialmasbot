@@ -3,546 +3,350 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>کافه هوشمند — دمو تعاملی</title>
+<title>کافه هوشمند الماس — میزکار تعاملی دو ربات (Service Bot + Manager Bot)</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;background:#0f172a;color:#f1f5f9;min-height:100vh;direction:rtl}
-header{background:#1e293b;border-bottom:1px solid #334155;padding:20px;text-align:center;position:sticky;top:0;z-index:100}
-header h1{font-size:1.4rem;color:#38bdf8}
-header p{color:#94a3b8;font-size:.85rem;margin-top:6px}
-main{max-width:1200px;margin:0 auto;padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
-@media(max-width:900px){main{grid-template-columns:1fr}}
+body{font-family:'Vazirmatn','Segoe UI',Tahoma,sans-serif;background:#0b1120;color:#f1f5f9;min-height:100vh;direction:rtl}
+header{background:rgba(30,41,59,.92);backdrop-filter:blur(10px);border-bottom:1px solid #334155;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#38bdf8);display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+.brand h1{font-size:1.1rem;color:#f8fafc;font-weight:700}
+.brand p{font-size:.78rem;color:#94a3b8;margin-top:2px}
+.nav-links{display:flex;gap:10px;align-items:center}
+.nav-btn{padding:7px 14px;border-radius:8px;font-size:.8rem;font-weight:600;text-decoration:none;border:1px solid #334155;background:#1e293b;color:#e2e8f0;cursor:pointer;font-family:inherit;transition:.2s}
+.nav-btn:hover{border-color:#6366f1;color:#fff}
+.nav-btn.primary{background:#6366f1;border-color:#6366f1;color:#fff}
 
-.panel{background:#1e293b;border:1px solid #334155;border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
-.panel-header{background:#273347;padding:14px 18px;font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:10px;border-bottom:1px solid #334155}
-.panel-header .icon{font-size:1.2rem}
-.panel-body{padding:16px;flex:1;overflow-y:auto;max-height:520px}
+.container{max-width:1360px;margin:0 auto;padding:20px}
+.stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:20px}
+.stat-pill{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.stat-pill .lbl{font-size:.76rem;color:#94a3b8}
+.stat-pill .val{font-size:1.35rem;font-weight:700}
 
-.chat{display:flex;flex-direction:column;gap:10px}
-.msg{max-width:80%;padding:10px 14px;border-radius:14px;font-size:.88rem;line-height:1.6;animation:pop .25s ease}
-@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.msg.bot{align-self:flex-start;background:#334155;color:#f1f5f9;border-bottom-right-radius:4px}
-.msg.user{align-self:flex-end;background:#6366f1;color:#fff;border-bottom-left-radius:4px}
-.typing{color:#94a3b8;font-size:.8rem;padding:4px 8px;animation:blink 1.2s infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.bots-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px}
+@media(max-width:960px){.bots-grid{grid-template-columns:1fr}}
 
-.service-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px}
-.service-card{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all .2s}
-.service-card:hover{border-color:#6366f1;transform:translateY(-2px)}
-.service-card .svc-icon{font-size:1.6rem;margin-bottom:6px}
-.service-card .svc-name{font-size:.8rem;color:#94a3b8;font-weight:500}
+.bot-panel{background:#1e293b;border:1px solid #334155;border-radius:16px;display:flex;flex-direction:column;height:660px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.bot-panel.service-bot{border-top:3px solid #38bdf8}
+.bot-panel.manager-bot{border-top:3px solid #a855f7}
 
-.flow{display:flex;flex-direction:column;gap:12px;margin-top:12px}
-.step{display:flex;align-items:center;gap:12px;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px;animation:pop .3s ease}
-.step-num{width:28px;height:28px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0}
-.step-content{flex:1}
-.step-title{font-size:.85rem;font-weight:600;color:#f1f5f9}
-.step-desc{font-size:.75rem;color:#94a3b8;margin-top:2px}
+.bot-header{background:#273347;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155}
+.bot-title{display:flex;align-items:center;gap:10px}
+.bot-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem}
+.service-bot .bot-avatar{background:rgba(56,189,248,.2);color:#38bdf8}
+.manager-bot .bot-avatar{background:rgba(168,85,247,.2);color:#c084fc}
+.bot-name{font-size:.92rem;font-weight:700;color:#f8fafc}
+.bot-sub{font-size:.72rem;color:#94a3b8}
+.bot-badge{font-size:.7rem;padding:3px 9px;border-radius:12px;font-weight:600}
+.service-bot .bot-badge{background:rgba(56,189,248,.15);color:#38bdf8}
+.manager-bot .bot-badge{background:rgba(168,85,247,.15);color:#c084fc}
 
-.terminal{background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px;font-family:'Courier New',monospace;font-size:.78rem;line-height:1.7;color:#a5f3fc;direction:ltr;text-align:left;margin-top:12px;max-height:260px;overflow-y:auto}
-.terminal .log-time{color:#64748b}
-.terminal .log-info{color:#38bdf8}
-.terminal .log-ok{color:#4ade80}
-.terminal .log-err{color:#f87171}
-.terminal .log-warn{color:#fbbf24}
+.quick-chips{padding:8px 12px;background:#162032;border-bottom:1px solid #334155;display:flex;gap:6px;overflow-x:auto;white-space:nowrap}
+.chip{padding:4px 10px;border-radius:20px;background:#1e293b;border:1px solid #334155;color:#cbd5e1;font-size:.73rem;cursor:pointer;font-family:inherit;transition:.15s}
+.chip:hover{background:#334155;color:#fff;border-color:#6366f1}
 
-.dashboard-preview{background:#fff;color:#1e293b;border-radius:12px;padding:16px;margin-top:12px;font-size:.75rem;direction:rtl}
-.dp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #e2e8f0}
-.dp-title{font-weight:700;color:#0f172a;font-size:.9rem}
-.dp-live{display:flex;align-items:center;gap:6px;color:#10b981;font-size:.75rem}
-.dp-live .dot{width:7px;height:7px;border-radius:50%;background:#10b981;animation:pulse 1.6s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.dp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.dp-stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}
-.dp-stat .v{font-size:1.2rem;font-weight:700;color:#0f172a}
-.dp-stat .l{font-size:.65rem;color:#64748b;margin-top:2px}
-.dp-table{width:100%;border-collapse:collapse;font-size:.7rem}
-.dp-table th{background:#f1f5f9;padding:6px 8px;text-align:right;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0}
-.dp-table td{padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#334155}
-.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.65rem;font-weight:600}
-.badge-ok{background:#dcfce7;color:#166534}
-.badge-warn{background:#fef3c7;color:#92400e}
-.badge-info{background:#dbeafe;color:#1e40af}
+.chat-area{flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:#0f172a}
+.msg-wrap{display:flex;flex-direction:column;max-width:88%}
+.msg-wrap.bot{align-self:flex-start}
+.msg-wrap.user{align-self:flex-end}
+.msg-bubble{padding:11px 14px;border-radius:14px;font-size:.84rem;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.msg-wrap.bot .msg-bubble{background:#1e293b;border:1px solid #334155;color:#f1f5f9;border-bottom-right-radius:4px}
+.msg-wrap.user .msg-bubble{background:#4f46e5;color:#fff;border-bottom-left-radius:4px}
+.msg-bubble code{background:rgba(0,0,0,.35);padding:1px 6px;border-radius:4px;font-family:monospace;color:#38bdf8}
 
-.controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.btn{padding:8px 16px;border:none;border-radius:8px;font-size:.8rem;cursor:pointer;font-family:inherit;transition:all .2s}
-.btn-primary{background:#6366f1;color:#fff}
-.btn-primary:hover{background:#4f46e5}
-.btn-secondary{background:#334155;color:#f1f5f9}
-.btn-secondary:hover{background:#475569}
-.btn:disabled{opacity:.5;cursor:not-allowed}
+.inline-kb{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.inline-row{display:flex;gap:5px;flex-wrap:wrap}
+.inline-btn{flex:1;min-width:110px;padding:7px 10px;background:rgba(51,65,85,.75);border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-size:.76rem;font-family:inherit;cursor:pointer;text-align:center;transition:.15s}
+.inline-btn:hover{background:#6366f1;border-color:#818cf8;color:#fff}
 
-.full-width{grid-column:1/-1}
+.chat-input-bar{padding:10px 14px;background:#1e293b;border-top:1px solid #334155;display:flex;gap:8px}
+.chat-input{flex:1;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 14px;color:#f8fafc;font-family:inherit;font-size:.85rem;outline:none}
+.chat-input:focus{border-color:#6366f1}
+.send-btn{padding:0 18px;border-radius:10px;border:none;background:#6366f1;color:#fff;font-family:inherit;font-weight:600;font-size:.84rem;cursor:pointer}
+.send-btn:hover{background:#4f46e5}
+
+.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:960px){.bottom-grid{grid-template-columns:1fr}}
+.info-card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:18px}
+.info-card h3{font-size:.95rem;margin-bottom:12px;color:#38bdf8;display:flex;align-items:center;justify-content:space-between}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{text-align:right;padding:8px 10px;background:#0f172a;color:#94a3b8;border-bottom:1px solid #334155}
+td{padding:8px 10px;border-bottom:1px solid #273347;color:#e2e8f0}
+.badge{padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600}
+.b-PENDING{background:rgba(245,158,11,.15);color:#fbbf24}
+.b-PROCESSING{background:rgba(59,130,246,.15);color:#60a5fa}
+.b-COMPLETED{background:rgba(34,197,94,.15);color:#4ade80}
+.b-FAILED{background:rgba(239,68,68,.15);color:#f87171}
+.toast-msg{font-size:.75rem;color:#38bdf8;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);padding:5px 10px;border-radius:8px;align-self:center}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>☕ کافه اینترنت الماس — دمو تعاملی</h1>
-  <p>سیستم هوشمند automating خدمات دولتی از طریق ربات تلگرام</p>
+  <div class="brand">
+    <div class="brand-logo">☕</div>
+    <div>
+      <h1>کافه اینترنت الماس — شبیه‌ساز زنده دو ربات (Service Bot & Manager Bot)</h1>
+      <p>معماری Serverless (Cloudflare Workers D1 + Express + n8n Workflows) · ۹ سرویس دولتی و قضایی</p>
+    </div>
+  </div>
+  <div class="nav-links">
+    <button class="nav-btn" onclick="runFullEndToEndScenario()">⚡ اجرای سناریوی کامل (مشتری ◄ مدیر ◄ نتیجه)</button>
+    <a href="/dashboard" class="nav-btn primary">📊 داشبورد مدیریت</a>
+  </div>
 </header>
 
-<main>
-
-  <!-- پنل چت تلگرام -->
-  <div class="panel">
-    <div class="panel-header"><span class="icon">💬</span> شبیه‌سازی چت تلگرام</div>
-    <div class="panel-body">
-      <div class="chat" id="chat"></div>
-      <div class="controls">
-        <button class="btn btn-primary" onclick="demoMygov()">🔐 دمو my.gov.ir</button>
-        <button class="btn btn-secondary" onclick="demoSana()">📋 دمو سانا</button>
-        <button class="btn btn-secondary" onclick="demoInsurance()">🏥 دمو بیمه</button>
-        <button class="btn btn-secondary" onclick="resetChat()">🔄 ریست</button>
-      </div>
-    </div>
+<div class="container">
+  <!-- نوار آمار زنده -->
+  <div class="stats-bar">
+    <div class="stat-pill"><span class="lbl">کل درخواست‌ها</span><span class="val" style="color:#818cf8" id="st-total">0</span></div>
+    <div class="stat-pill"><span class="lbl">در صف انتظار</span><span class="val" style="color:#fbbf24" id="st-pending">0</span></div>
+    <div class="stat-pill"><span class="lbl">در حال انجام</span><span class="val" style="color:#38bdf8" id="st-proc">0</span></div>
+    <div class="stat-pill"><span class="lbl">تکمیل‌شده</span><span class="val" style="color:#4ade80" id="st-done">0</span></div>
+    <div class="stat-pill"><span class="lbl">کارشناسان فعال</span><span class="val" style="color:#c084fc" id="st-mgrs">0</span></div>
+    <div class="stat-pill"><span class="lbl">نوبت‌های باز</span><span class="val" style="color:#34d399" id="st-slots">0</span></div>
   </div>
 
-  <!-- پنل جریان کاری -->
-  <div class="panel">
-    <div class="panel-header"><span class="icon">🔄</span> جریان کاری سیستم</div>
-    <div class="panel-body">
-      <div class="flow">
-        <div class="step"><div class="step-num">۱</div><div class="step-content"><div class="step-title">کاربر دستور را ارسال می‌کند</div><div class="step-desc">مثلاً /mygov — هوش مصنوعی FSM را شروع می‌کند</div></div></div>
-        <div class="step"><div class="step-num">۲</div><div class="step-content"><div class="step-title">جمع‌آوری اطلاعات با AI</div><div class="step-desc">گپ دوطرفه تا تکمیل تمام فیلدهای الزامی</div></div></div>
-        <div class="step"><div class="step-num">۳</div><div class="step-content"><div class="step-title">ایجاد کار در صف</div><div class="step-desc">ثبت درخواست با وضعیت PENDING در پایگاه داده</div></div></div>
-        <div class="step"><div class="step-num">۴</div><div class="step-content"><div class="step-title">عامل محلی کار را دریافت می‌کند</div><div class="step-desc">Poll → Claim → باز کردن پورتال در Chromium</div></div></div>
-        <div class="step"><div class="step-num">۵</div><div class="step-content"><div class="step-title">اپراتور CAPTCHA را حل می‌کند</div><div class="step-desc">مرورگر headed برای ورود دستی اپراتور</div></div></div>
-        <div class="step"><div class="step-num">۶</div><div class="step-content"><div class="step-title">گزارش نتیجه به کاربر</div><div class="step-desc">ارسال پیام موفقیت/ناموفقی در تلگرام</div></div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- پنل ترمینال عامل محلی -->
-  <div class="panel">
-    <div class="panel-header"><span class="icon">🖥️</span> ترمینال عامل محلی Playwright</div>
-    <div class="panel-body">
-      <div class="terminal" id="terminal">
-        <div><span class="log-time">[00:00]</span> <span class="log-info">Smart Cafe Local Scraper Agent</span></div>
-        <div><span class="log-time">[00:00]</span> <span class="log-ok">API URL    :</span> https://bot.example.com</div>
-        <div><span class="log-time">[00:00]</span> <span class="log-ok">Poll every :</span> 30s</div>
-        <div><span class="log-time">[00:00]</span> <span class="log-warn">CAPTCHA timeout:</span> 120s</div>
-        <div><span class="log-time">[00:00]</span> <span class="log-info">Waiting for jobs...</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- پنل سرویس‌های قابل دسترسی -->
-  <div class="panel">
-    <div class="panel-header"><span class="icon">🌐</span> سرویس‌های دولتی یکپارچه‌شده</div>
-    <div class="panel-body">
-      <div class="service-grid">
-        <div class="service-card" onclick="demoMygov()"><div class="svc-icon">🔐</div><div class="svc-name">my.gov.ir</div></div>
-        <div class="service-card" onclick="demoSana()"><div class="svc-icon">📋</div><div class="svc-name">sana.ir</div></div>
-        <div class="service-card" onclick="demoTax()"><div class="svc-icon">💰</div><div class="svc-name">my.tax.gov.ir</div></div>
-        <div class="service-card" onclick="demoInsurance()"><div class="svc-icon">🏥</div><div class="svc-name">eservice.tamin.ir</div></div>
-        <div class="service-card" onclick="demoMojavez()"><div class="svc-icon">📄</div><div class="svc-name">mojavez.ir</div></div>
-        <div class="service-card" onclick="demoAmlak()"><div class="svc-icon">🏠</div><div class="svc-name">amlak.mrud.ir</div></div>
-        <div class="service-card" onclick="demoKhodnevis()"><div class="svc-icon">✍️</div><div class="svc-name">khodnevis.mrud.ir</div></div>
-        <div class="service-card" onclick="demoSaman()"><div class="svc-icon">🏦</div><div class="svc-name">saman.mrud.ir</div></div>
-      </div>
-
-      <div class="dashboard-preview">
-        <div class="dp-header">
-          <div class="dp-title">☕ داشبورد مدیریتی — کافه هوشمند</div>
-          <div class="dp-live"><span class="dot"></span> آنلاین</div>
+  <!-- دو ربات در کنار هم -->
+  <div class="bots-grid">
+    <!-- ۱. ربات خدمات مشتریان (Service-End Bot) -->
+    <div class="bot-panel service-bot">
+      <div class="bot-header">
+        <div class="bot-title">
+          <div class="bot-avatar">👤</div>
+          <div>
+            <div class="bot-name">ربات خدمات مشتریان (Service-End Bot)</div>
+            <div class="bot-sub">انتخاب سرویس، رزرو نوبت، دریافت نتیجه و پشتیبانی</div>
+          </div>
         </div>
-        <div class="dp-stats">
-          <div class="dp-stat"><div class="v" id="dp-total">۲۴</div><div class="l">کل درخواست‌ها</div></div>
-          <div class="dp-stat"><div class="v" style="color:#f59e0b" id="dp-pending">۳</div><div class="l">در انتظار</div></div>
-          <div class="dp-stat"><div class="v" style="color:#10b981" id="dp-done">۱۸</div><div class="l">تکمیل‌شده</div></div>
-        </div>
-        <table class="dp-table">
-          <thead><tr><th>#</th><th>سرویس</th><th>کاربر</th><th>وضعیت</th><th>زمان</th></tr></thead>
-          <tbody id="dp-body">
-            <tr><td>#۱۲۳</td><td>my.gov.ir</td><td>@ali</td><td><span class="badge badge-warn">در انتظار</span></td><td>۱۴:۳۲</td></tr>
-            <tr><td>#۱۲۲</td><td>eservice.tamin.ir</td><td>@sara</td><td><span class="badge badge-ok">تکمیل‌شده</span></td><td>۱۴:۱۵</td></tr>
-            <tr><td>#۱۲۱</td><td>sana.ir</td><td>@reza</td><td><span class="badge badge-info">در پردازش</span></td><td>۱۳:۵۸</td></tr>
-          </tbody>
-        </table>
+        <span class="bot-badge">@CafialmasServiceBot</span>
       </div>
+      <div class="quick-chips">
+        <button class="chip" onclick="sendBotMsg('service','/start')">🏠 /start</button>
+        <button class="chip" onclick="sendBotMsg('service','/services')">🛎 کاتالوگ ۹ سرویس</button>
+        <button class="chip" onclick="sendBotMsg('service','/slots')">🕒 رزرو نوبت</button>
+        <button class="chip" onclick="sendBotMsg('service','/sana')">⚖️ /sana</button>
+        <button class="chip" onclick="sendBotMsg('service','/tax')">💰 /tax</button>
+        <button class="chip" onclick="sendBotMsg('service','/mygov')">🔐 /mygov</button>
+        <button class="chip" onclick="sendBotMsg('service','/my_jobs')">📋 نتایج من</button>
+        <button class="chip" onclick="sendBotMsg('service','/support')">💬 پشتیبانی</button>
+      </div>
+      <div class="chat-area" id="chat-service"></div>
+      <form class="chat-input-bar" onsubmit="handleFormSubmit(event, 'service')">
+        <input id="input-service" class="chat-input" placeholder="پیام یا دستور مشتری (مثلاً /sana یا کد ملی 0012345678)..." autocomplete="off">
+        <button type="submit" class="send-btn">ارسال</button>
+      </form>
+    </div>
+
+    <!-- ۲. ربات مدیران و ارائه‌دهندگان خدمات (Manager-End Bot) -->
+    <div class="bot-panel manager-bot">
+      <div class="bot-header">
+        <div class="bot-title">
+          <div class="bot-avatar">👨‍💼</div>
+          <div>
+            <div class="bot-name">ربات مدیران و کارشناسان (Manager-End Bot)</div>
+            <div class="bot-sub">تنظیم ساعت و نوبت، پذیرش کار، ارسال نتیجه و پاسخ تیکت</div>
+          </div>
+        </div>
+        <span class="bot-badge">@CafialmasManagerBot</span>
+      </div>
+      <div class="quick-chips">
+        <button class="chip" onclick="sendBotMsg('manager','/manager')">👨‍💼 پنل مدیریت</button>
+        <button class="chip" onclick="sendBotClick('manager','MGR_SLOTS')">🕒 مدیریت زمان و نوبت</button>
+        <button class="chip" onclick="sendBotClick('manager','MGR_QUEUE')">📥 صف درخواست‌ها</button>
+        <button class="chip" onclick="sendBotClick('manager','MGR_MY_JOBS')">⚙️ کارهای جاری من</button>
+        <button class="chip" onclick="sendBotClick('manager','MGR_SERVICES')">🛠 سرویس‌های من</button>
+        <button class="chip" onclick="sendBotClick('manager','MGR_TICKETS')">💬 تیکت‌ها</button>
+      </div>
+      <div class="chat-area" id="chat-manager"></div>
+      <form class="chat-input-bar" onsubmit="handleFormSubmit(event, 'manager')">
+        <input id="input-manager" class="chat-input" placeholder="پیام کارشناس (مثلاً /set_time 1405/07/26 09:00 11:00 یا نتیجه کار)..." autocomplete="off">
+        <button type="submit" class="send-btn" style="background:#9333ea">ارسال</button>
+      </form>
     </div>
   </div>
 
-</main>
+  <!-- جداول زنده پایگاه داده -->
+  <div class="bottom-grid">
+    <div class="info-card">
+      <h3><span>📋 آخرین درخواست‌های ثبت‌شده</span><span style="font-size:.75rem;color:#94a3b8">بروزرسانی زنده</span></h3>
+      <table>
+        <thead><tr><th>#</th><th>سرویس</th><th>مشتری</th><th>کارشناس</th><th>وضعیت</th><th>نتیجه</th></tr></thead>
+        <tbody id="tbl-jobs"><tr><td colspan="6" style="text-align:center;color:#64748b">در حال بارگذاری...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="info-card">
+      <h3><span>🕒 نوبت‌های زمانی فعال کارشناسان (Time Slots)</span><span style="font-size:.75rem;color:#94a3b8">رزرو آنلاین</span></h3>
+      <table>
+        <thead><tr><th>#</th><th>کارشناس</th><th>تاریخ</th><th>ساعت</th><th>ظرفیت</th><th>وضعیت</th></tr></thead>
+        <tbody id="tbl-slots"><tr><td colspan="6" style="text-align:center;color:#64748b">در حال بارگذاری...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
 <script>
-const chat = document.getElementById('chat');
-const terminal = document.getElementById('terminal');
+const serviceChat = document.getElementById('chat-service');
+const managerChat = document.getElementById('chat-manager');
 
-function addMsg(text, who='bot') {
-  const div = document.createElement('div');
-  div.className = 'msg ' + who;
-  div.textContent = text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+function appendUserBubble(botType, text) {
+  const container = botType === 'manager' ? managerChat : serviceChat;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-wrap user';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
 }
 
-function addTyping() {
-  const div = document.createElement('div');
-  div.className = 'msg bot typing';
-  div.id = 'typing';
-  div.textContent = 'در حال تایپ...';
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+function appendBotMessages(botType, messages) {
+  const container = botType === 'manager' ? managerChat : serviceChat;
+  for (const m of (messages || [])) {
+    if (m.method === 'toast') {
+      const t = document.createElement('div');
+      t.className = 'toast-msg';
+      t.textContent = '🔔 ' + m.text;
+      container.appendChild(t);
+      continue;
+    }
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-wrap bot';
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = m.text || '';
+    wrap.appendChild(bubble);
+
+    const rows = m.reply_markup?.inline_keyboard;
+    if (Array.isArray(rows) && rows.length) {
+      const kbDiv = document.createElement('div');
+      kbDiv.className = 'inline-kb';
+      for (const row of rows) {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'inline-row';
+        for (const btn of row) {
+          const b = document.createElement('button');
+          b.className = 'inline-btn';
+          b.textContent = btn.text;
+          b.onclick = () => {
+            const targetBot = (btn.callback_data || '').startsWith('MGR_') ? 'manager' : botType;
+            sendBotClick(targetBot, btn.callback_data, btn.text);
+          };
+          rowDiv.appendChild(b);
+        }
+        kbDiv.appendChild(rowDiv);
+      }
+      wrap.appendChild(kbDiv);
+    }
+    container.appendChild(wrap);
+  }
+  container.scrollTop = container.scrollHeight;
 }
 
-function removeTyping() {
-  const t = document.getElementById('typing');
-  if (t) t.remove();
+function renderLiveTables(stats) {
+  if (!stats) return;
+  document.getElementById('st-total').textContent = stats.total_jobs ?? 0;
+  document.getElementById('st-pending').textContent = stats.pending ?? 0;
+  document.getElementById('st-proc').textContent = stats.processing ?? 0;
+  document.getElementById('st-done').textContent = stats.completed ?? 0;
+  document.getElementById('st-mgrs').textContent = (stats.managers || []).length;
+  document.getElementById('st-slots').textContent = (stats.open_slots || []).length;
+
+  const jobsBody = document.getElementById('tbl-jobs');
+  const jobs = stats.recent_jobs || [];
+  if (!jobs.length) {
+    jobsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#64748b">هنوز درخواستی ثبت نشده است</td></tr>';
+  } else {
+    jobsBody.innerHTML = jobs.slice(0, 6).map(j => `
+      <tr>
+        <td>#${j.id}</td>
+        <td><b>${j.task_type}</b></td>
+        <td><code>${j.user_id}</code></td>
+        <td>${j.assigned_manager_id || 'صف عمومی'}</td>
+        <td><span class="badge b-${j.status}">${j.status}</span></td>
+        <td>${j.result_data?.summary ? j.result_data.summary.slice(0, 32) : (j.rating ? '⭐'.repeat(j.rating) : '—')}</td>
+      </tr>
+    `).join('');
+  }
+
+  const slotsBody = document.getElementById('tbl-slots');
+  const slots = stats.open_slots || [];
+  if (!slots.length) {
+    slotsBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#64748b">هیچ نوبت بازی وجود ندارد</td></tr>';
+  } else {
+    slotsBody.innerHTML = slots.slice(0, 6).map(s => `
+      <tr>
+        <td>#${s.id}</td>
+        <td>${s.manager_name || s.manager_id}</td>
+        <td><code>${s.slot_date}</code></td>
+        <td><code>${s.start_time} - ${s.end_time}</code></td>
+        <td>${s.booked_count}/${s.capacity}</td>
+        <td><span class="badge b-COMPLETED">OPEN</span></td>
+      </tr>
+    `).join('');
+  }
 }
 
-function addLog(text, cls='log-info') {
-  const d = new Date();
-  const t = d.toTimeString().slice(0,8);
-  const div = document.createElement('div');
-  div.innerHTML = `<span class="log-time">[${t}]</span> <span class="${cls}">${text}</span>`;
-  terminal.appendChild(div);
-  terminal.scrollTop = terminal.scrollHeight;
+async function sendBotMsg(bot, text) {
+  appendUserBubble(bot, text);
+  const res = await fetch('/api/simulate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bot, type: 'message', text }),
+  }).then(r => r.json());
+  if (res.ok) {
+    appendBotMessages('service', res.customer_messages);
+    appendBotMessages('manager', res.manager_messages);
+    renderLiveTables(res.stats);
+  }
 }
 
-function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-async function resetChat() {
-  chat.innerHTML = '';
-  addMsg('سلام! به ربات هوشمند کافه اینترنت خوش آمدید.', 'bot');
-  addMsg('دستورات موجود: /mygov /tax /insurance /mojavez /amlak /khodnevis /saman /sana /gica', 'bot');
-  terminal.innerHTML = `
-    <div><span class="log-time">[00:00]</span> <span class="log-info">Smart Cafe Local Scraper Agent</span></div>
-    <div><span class="log-time">[00:00]</span> <span class="log-ok">API URL    :</span> https://bot.example.com</div>
-    <div><span class="log-time">[00:00]</span> <span class="log-ok">Poll every :</span> 30s</div>
-    <div><span class="log-time">[00:00]</span> <span class="log-warn">CAPTCHA timeout:</span> 120s</div>
-    <div><span class="log-time">[00:00]</span> <span class="log-info">Waiting for jobs...</span></div>`;
+async function sendBotClick(bot, callbackData, labelText) {
+  if (labelText) appendUserBubble(bot, '🔘 ' + labelText);
+  const res = await fetch('/api/simulate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bot, type: 'callback_query', data: callbackData }),
+  }).then(r => r.json());
+  if (res.ok) {
+    appendBotMessages('service', res.customer_messages);
+    appendBotMessages('manager', res.manager_messages);
+    renderLiveTables(res.stats);
+  }
 }
 
-async function demoMygov() {
-  resetChat();
-  await wait(300);
-  addMsg('/mygov', 'user');
-  addTyping();
-  await wait(800);
-  removeTyping();
-  addMsg('🔐 شروع فرآیند ورود به my.gov.ir\n\nلطفاً شماره موبایل خود را وارد کنید:', 'bot');
-  addLog('New job created: MYGOV', 'log-info');
-
-  await wait(1500);
-  addMsg('۰۹۱۲۳۴۵۶۷۸۹', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('✅ شماره موبایل ثبت شد.\nلطفاً کد ملی را وارد کنید:', 'bot');
-
-  await wait(1200);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(600);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nلطفاً تاریخ تولد (YYYY/MM/DD) را وارد کنید:', 'bot');
-
-  await wait(1000);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
-  await wait(600);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nلطفاً محل تولد را وارد کنید:', 'bot');
-
-  await wait(900);
-  addMsg('تهران', 'user');
-  addTyping();
-  await wait(800);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست my.gov.ir در صف پردازش قرار گرفت.\nکارمند کافه به‌زودی آن را انجام می‌دهد.', 'bot');
-
-  addLog('Polling... found 1 pending job(s).', 'log-info');
-  addLog('[Agent] Processing job #124 | type=MYGOV | user=@user', 'log-info');
-  addLog('[Agent] Claimed job #124', 'log-ok');
-  addLog('[MYGOV] Navigating to portal...', 'log-info');
-  addLog('[MYGOV] Filled: phone_number, national_id, birth_date, birth_place', 'log-info');
-  addLog('⚠️  CAPTCHA visible. Operator has 120s to solve and submit.', 'log-warn');
-  addLog('[MYGOV] Form submitted successfully.', 'log-ok');
-  addLog('[Agent] ✅ Job #124 completed.', 'log-ok');
-
-  updateDashboard('my.gov.ir', 'تکمیل‌شده');
+function handleFormSubmit(e, bot) {
+  e.preventDefault();
+  const input = document.getElementById('input-' + bot);
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  sendBotMsg(bot, text);
 }
 
-async function demoSana() {
-  resetChat();
-  await wait(300);
-  addMsg('/sana', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('📋 شروع فرآیند ثبت درخواست سانا\n\nلطفاً کد ملی را وارد کنید:', 'bot');
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
-  await wait(1000);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
+async function runFullEndToEndScenario() {
+  serviceChat.innerHTML = '';
+  managerChat.innerHTML = '';
+  await sendBotMsg('manager', '/manager');
+  await wait(400);
+  await sendBotMsg('manager', '/set_time 1405/07/26 10:00 11:30 2');
   await wait(500);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nتاریخ تولد (YYYY/MM/DD):', 'bot');
-
-  await wait(800);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
+  await sendBotMsg('service', '/sana');
   await wait(500);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nشماره موبایل:', 'bot');
-
-  await wait(700);
-  addMsg('۰۹۱۲۳۴۵۶۷۸۹', 'user');
-  addTyping();
+  await sendBotMsg('service', '0012345678 1372/04/18 09123456789');
   await wait(500);
-  removeTyping();
-  addMsg('✅ موبایل ثبت شد.\nسریال شناسنامه:', 'bot');
-
-  await wait(600);
-  addMsg('ب۱۲۳۴۵۶', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست سانا در صف پردازش قرار گرفت.', 'bot');
-
-  addLog('Polling... found 1 pending job(s).', 'log-info');
-  addLog('[Agent] Processing job #125 | type=SANA | user=@user', 'log-info');
-  addLog('[SANA] Navigating to portal...', 'log-info');
-  addLog('[SANA] Filled: national_id, birth_date, mobile_number, serial_number', 'log-info');
-  addLog('⚠️  CAPTCHA visible. Operator has 120s to solve and submit.', 'log-warn');
-  addLog('[SANA] Form submitted successfully.', 'log-ok');
-  addLog('[Agent] ✅ Job #125 completed.', 'log-ok');
-
-  updateDashboard('sana.ir', 'تکمیل‌شده');
+  await sendBotMsg('service', 'ب123456');
 }
 
-async function demoInsurance() {
-  resetChat();
-  await wait(300);
-  addMsg('/insurance', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('🏥 شروع فرآیند بیمه تامین اجتماعی / تکمیلی\n\nلطفاً کد ملی را وارد کنید:', 'bot');
-
-  await wait(1000);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(500);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nتاریخ تولد:', 'bot');
-
-  await wait(800);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
-  await wait(500);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nشماره بیمه:', 'bot');
-
-  await wait(700);
-  addMsg('۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(500);
-  removeTyping();
-  addMsg('✅ شماره بیمه ثبت شد.\nنوع بیمه (پایه یا تکمیلی):', 'bot');
-
-  await wait(600);
-  addMsg('تکمیلی', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست eservice.tamin.ir در صف پردازش قرار گرفت.', 'bot');
-
-  addLog('Polling... found 1 pending job(s).', 'log-info');
-  addLog('[Agent] Processing job #126 | type=INSURANCE | user=@user', 'log-info');
-  addLog('[INSURANCE] Navigating to portal...', 'log-info');
-  addLog('[INSURANCE] Filled: national_id, birth_date, insurance_number, insurance_type', 'log-info');
-  addLog('⚠️  CAPTCHA visible. Operator has 120s to solve and submit.', 'log-warn');
-  addLog('[INSURANCE] Form submitted successfully.', 'log-ok');
-  addLog('[Agent] ✅ Job #126 completed.', 'log-ok');
-
-  updateDashboard('eservice.tamin.ir', 'تکمیل‌شده');
-}
-
-async function demoTax() {
-  resetChat();
-  await wait(300);
-  addMsg('/tax', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('💰 شروع امور مالیاتی my.tax.gov.ir\n\nلطفاً کد ملی را وارد کنید:', 'bot');
-  await wait(600);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nتاریخ تولد:', 'bot');
-  await wait(500);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nتوکن my.gov.ir:', 'bot');
-  await wait(400);
-  addMsg('MYGOV-TOKEN-12345678', 'user');
-  addTyping();
-  await wait(600);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست my.tax.gov.ir در صف پردازش قرار گرفت.', 'bot');
-  addLog('[Agent] ✅ Job #127 completed.', 'log-ok');
-  updateDashboard('my.tax.gov.ir', 'تکمیل‌شده');
-}
-
-async function demoMojavez() {
-  resetChat();
-  await wait(300);
-  addMsg('/mojavez', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('📄 شروع مجوز کسب — mojavez.ir\n\nلطفاً کد ملی را وارد کنید:', 'bot');
-  await wait(500);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nتاریخ تولد:', 'bot');
-  await wait(400);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nنوع کسب:', 'bot');
-  await wait(400);
-  addMsg('رستوران', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ نوع کسب ثبت شد.\nآدرس کسب:', 'bot');
-  await wait(400);
-  addMsg('تهران، خیابان انقلاب، پلاک ۱۰۰', 'user');
-  addTyping();
-  await wait(600);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست mojavez.ir در صف پردازش قرار گرفت.', 'bot');
-  addLog('[Agent] ✅ Job #128 completed.', 'log-ok');
-  updateDashboard('mojavez.ir', 'تکمیل‌شده');
-}
-
-async function demoAmlak() {
-  resetChat();
-  await wait(300);
-  addMsg('/amlak', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('🏠 شروع استعلام املاک — amlak.mrud.ir\n\nلطفاً کد ملی را وارد کنید:', 'bot');
-  await wait(500);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nتاریخ تولد:', 'bot');
-  await wait(400);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nآدرس:', 'bot');
-  await wait(400);
-  addMsg('تهران، ولیعصر، پلاک ۲۰۰', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ آدرس ثبت شد.\nکد پستی:', 'bot');
-  await wait(400);
-  addMsg('۱۲۳۴۵۶۷۸۹', 'user');
-  addTyping();
-  await wait(600);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست amlak.mrud.ir در صف پردازش قرار گرفت.', 'bot');
-  addLog('[Agent] ✅ Job #129 completed.', 'log-ok');
-  updateDashboard('amlak.mrud.ir', 'تکمیل‌شده');
-}
-
-async function demoKhodnevis() {
-  resetChat();
-  await wait(300);
-  addMsg('/khodnevis', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('✍️ شروع قرارداد خنویس — khodnevis.mrud.ir\n\nلطفاً کد ملی را وارد کنید:', 'bot');
-  await wait(500);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nتاریخ تولد:', 'bot');
-  await wait(400);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nنوع قرارداد:', 'bot');
-  await wait(400);
-  addMsg('خرید', 'user');
-  addTyping();
-  await wait(600);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست khodnevis.mrud.ir در صف پردازش قرار گرفت.', 'bot');
-  addLog('[Agent] ✅ Job #130 completed.', 'log-ok');
-  updateDashboard('khodnevis.mrud.ir', 'تکمیل‌شده');
-}
-
-async function demoSaman() {
-  resetChat();
-  await wait(300);
-  addMsg('/saman', 'user');
-  addTyping();
-  await wait(700);
-  removeTyping();
-  addMsg('🏦 شروع وام سامان — saman.mrud.ir\n\nلطفاً کد ملی را وارد کنید:', 'bot');
-  await wait(500);
-  addMsg('۰۰۱۲۳۴۵۶۷۸', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ کد ملی ثبت شد.\nتاریخ تولد:', 'bot');
-  await wait(400);
-  addMsg('۱۳۷۰/۰۵/۱۵', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ تاریخ تولد ثبت شد.\nمبلغ وام (تومان):', 'bot');
-  await wait(400);
-  addMsg('۵۰۰,۰۰۰,۰۰۰', 'user');
-  addTyping();
-  await wait(400);
-  removeTyping();
-  addMsg('✅ مبلغ وام ثبت شد.\nنوع وام:', 'bot');
-  await wait(400);
-  addMsg('مسکن', 'user');
-  addTyping();
-  await wait(600);
-  removeTyping();
-  addMsg('✅ اطلاعات کامل شد! درخواست saman.mrud.ir در صف پردازش قرار گرفت.', 'bot');
-  addLog('[Agent] ✅ Job #131 completed.', 'log-ok');
-  updateDashboard('saman.mrud.ir', 'تکمیل‌شده');
-}
-
-function updateDashboard(service, status) {
-  const tbody = document.getElementById('dp-body');
-  const now = new Date().toTimeString().slice(0,5);
-  const badgeClass = status === 'تکمیل‌شده' ? 'badge-ok' : 'badge-warn';
-  const row = `<tr><td>#${Math.floor(Math.random()*900)+100}</td><td>${service}</td><td>@user</td><td><span class="badge ${badgeClass}">${status}</span></td><td>${now}</td></tr>`;
-  tbody.insertAdjacentHTML('afterbegin', row);
-  const total = document.getElementById('dp-total');
-  total.textContent = parseInt(total.textContent) + 1;
-  const done = document.getElementById('dp-done');
-  done.textContent = parseInt(done.textContent) + 1;
-}
-
-resetChat();
+// Initialize both bots on page load
+(async () => {
+  await sendBotMsg('service', '/start');
+  await sendBotMsg('manager', '/manager');
+})();
 </script>
-
 </body>
 </html>

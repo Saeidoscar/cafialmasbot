@@ -1,0 +1,109 @@
+{
+  "name": "Cafialmas — 2. Manager-End Bot (Provider Time Slots, Job Queue & Results)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 👨‍💼 Cafialmas Manager-End Bot (Service Provider Bot)\nAllows managers/operators to:\n1. Register & select which of the 9 services they provide\n2. Set their working hours and available appointment time slots (`/set_time`)\n3. Claim pending customer requests atomically (`claim_job`)\n4. Deliver results & tracking codes directly to the customer (`complete_job`)\n5. Receive scheduled SLA reminders for pending queue items",
+        "height": 230,
+        "width": 540
+      },
+      "id": "sticky-manager-1",
+      "name": "Manager Bot Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [180, 60]
+    },
+    {
+      "parameters": {
+        "updates": ["message", "callback_query"]
+      },
+      "id": "tg-trigger-manager",
+      "name": "Manager Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 340],
+      "webhookId": "cafialmas-manager-bot-webhook"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      },
+      "id": "cron-sla-check",
+      "name": "SLA Queue Check (Every 15m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 560]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "WORKER_API_URL",
+              "value": "={{ $env.CAFIALMAS_API_URL || 'http://localhost:3000' }}"
+            },
+            {
+              "name": "AGENT_API_KEY",
+              "value": "={{ $env.AGENT_API_KEY || 'dev-agent-key-cafialmas-2026' }}"
+            }
+          ]
+        }
+      },
+      "id": "set-config-manager",
+      "name": "Manager Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [440, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node['Manager Config'].json.WORKER_API_URL }}/webhook/manager",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "http-manager-webhook",
+      "name": "Execute Manager Bot Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [720, 340]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.CAFIALMAS_API_URL || 'http://localhost:3000') }}/api/jobs?status=PENDING&limit=20",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "={{ $env.AGENT_API_KEY || 'dev-agent-key-cafialmas-2026' }}"
+            }
+          ]
+        }
+      },
+      "id": "http-fetch-pending-jobs",
+      "name": "Check Pending Customer Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 560]
+    }
+  ],
+  "connections": {
+    "Manager Telegram Trigger": {
+      "main": [[{ "node": "Manager Config", "type": "main", "index": 0 }]]
+    },
+    "Manager Config": {
+      "main": [[{ "node": "Execute Manager Bot Handler", "type": "main", "index": 0 }]]
+    },
+    "SLA Queue Check (Every 15m)": {
+      "main": [[{ "node": "Check Pending Customer Jobs", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

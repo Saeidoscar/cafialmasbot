@@ -9,9 +9,15 @@ binding       = "DB"
 database_name = "smart-cafe-db"
 database_id   = "ee8bf3b1-3cb5-45dd-a647-f4db26654c24"
 
+[triggers]
+crons = ["*/15 * * * *"]
+
 [vars]
-BOT_TOKEN       = ""
-OPENAI_API_KEY  = ""
-OPENAI_BASE_URL = ""
-OPENAI_MODEL    = ""
-AGENT_API_KEY   = ""
+BOT_TOKEN           = ""
+MANAGER_BOT_TOKEN   = ""
+MANAGER_SECRET_CODE = ""
+MANAGER_IDS         = ""
+OPENAI_API_KEY      = ""
+OPENAI_BASE_URL     = ""
+OPENAI_MODEL        = ""
+AGENT_API_KEY       = ""

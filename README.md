@@ -1,234 +1,103 @@
-# Smart Internet Cafe — Serverless Telegram Bot + Local Playwright Agent
+# Smart Internet Cafe (کافه اینترنت الماس) — Serverless Dual-Bot Ecosystem + n8n Workflows + Playwright Agent
 
 <div align="right">
 
-![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=flat-square)
-![Node](https://img.shields.io/badge/Node.js-18%2B-339933?style=flat-square)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-D1_Serverless-F38020?style=flat-square)
+![Node](https://img.shields.io/badge/Node.js-18%2B%20%2F%2022-339933?style=flat-square)
+![n8n](https://img.shields.io/badge/n8n-Workflows_Included-EA4B71?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Active-success?style=flat-square)
 
 </div>
 
-A production-ready, decoupled system for automating **Iranian government portal registrations** from an Internet Cafe. Users interact via Telegram bot commands; a local Windows/VPS agent uses Playwright to fill forms and handle CAPTCHAs.
+A complete, serverless **Two-Bot Telegram Ecosystem** for automating and managing **9 Iranian government & internet cafe services** (`SANA`, `GICA`, `MYGOV`, `TAX`, `INSURANCE`, `MOJAVEZ`, `AMLAK`, `KHODNEWIS`, `SAMAN`):
+
+1. **👤 Service-End Bot (Customer Bot — `/webhook` or `/webhook/service`)**:
+   - Customers browse all **9 services** by category (`/services`) or launch directly (`/sana`, `/gica`, `/mygov`, `/tax`, `/insurance`, `/mojavez`, `/amlak`, `/khodnevis`, `/saman`).
+   - Customers can either enter the **⚡ Instant Queue** OR **🕒 Book a Manager's Time Slot** (`/slots`).
+   - **Hybrid AI + Deterministic Slot-Filling FSM** (`src/lib/ai.js`) pre-fills saved credentials from the customer's document vault (`/my_docs`) and validates inputs (with automatic Persian digit normalization `۰-۹ → 0-9`).
+   - Customers receive **real-time results & tracking codes**, rate the manager **1–5 ⭐**, and open **two-way support tickets** (`/support`).
+
+2. **👨‍💼 Manager-End Bot (Provider / Operator Bot — `/webhook/manager` or `/manager`)**:
+   - Managers register (`/register_manager`), toggle **🟢 Online / 🔴 Offline** availability, and choose which of the **9 services** they provide.
+   - Managers **set their working hours and available appointment time slots** (`/set_time` or 1-tap shift buttons).
+   - Managers view & claim pending jobs (`MGR_CLAIM`), request OTP/clarifications from the customer (`MGR_ASK_PROMPT`), and deliver final results (`/complete`) directly to the customer on the Service Bot.
+   - Managers reply to customer support tickets (`MGR_TICKETS`) and track their ratings and completed job statistics.
+
+3. **🔗 n8n JSON Workflows (`n8n/`) & Local Playwright Agent (`local_agent/`)**:
+   - Includes 3 ready-to-import n8n workflows (`n8n/service-customer-bot.workflow.json`, `n8n/manager-provider-bot.workflow.json`, `n8n/support-ticket-relay.workflow.json`) connected to `POST /api/n8n/webhook`.
+   - Includes headed Playwright automation (`local_agent/scraper.js`) for automatic portal form-filling with manual CAPTCHA solving.
+
+---
+
+## Architecture Overview
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the reverse-engineering breakdown of [`freezerain/telegram-bot`](https://github.com/freezerain/telegram-bot), [`morluto/rea`](https://github.com/morluto/rea), and top Telegram booking & support bots.
 
 ```
-┌─────────────────────────────────────┐
-│  Telegram User                      │
-│  sends /sana or /gica               │
-└────────────────┬────────────────────┘
-                 │ Telegram Bot API
-                 ▼
-┌─────────────────────────────────────┐       ┌────────────────────────┐
-│  tgcloud (serverless)               │ HTTP  │  Local VPS / Windows   │
-│  index.js → handlers/message.js     │◄─────►│  local_agent/scraper.js│
-│  lib/ai.js (GPT slot-filling)       │  API  │  Playwright Chromium   │
-│  SQLite DB (schema.js)              │       │  (headed, for CAPTCHA) │
-└─────────────────────────────────────┘       └────────────────────────┘
+Customer (@ServiceBot) ──► POST /webhook/service ──┐
+                                                   ├──► Serverless Core (Workers D1 / Express SQLite)
+Manager  (@ManagerBot) ──► POST /webhook/manager ──┤    • 9 Services Catalog (src/lib/services.js)
+                                                   │    • Hybrid AI + Regex Slot-Filling (src/lib/ai.js)
+n8n Workflows (n8n/*.json) ► POST /api/n8n/webhook ┘    • Time Slots, Jobs & Support Tickets
 ```
 
-## Features
+---
 
-- **9 Government Services** — SANA, GICA, MYGOV, TAX, INSURANCE, MOJAVEZ, AMLAK, KHODNEWIS, SAMAN
-- **AI-Powered Slot Filling** — GPT-4o-mini collects required fields via Persian conversation FSM
-- **Local CAPTCHA Solving** — headed Chromium lets cafe operator solve CAPTCHAs manually
-- **Dual Deployment** — Cloudflare Workers (`src/`) + Render Express (`server.js`)
-- **PHP Admin Dashboard** — modern RTL Persian interface with stats, job management, and service workflows
-- **Security Hardened** — `.gitignore`, rate limiting, input validation, security headers, CSRF protection, session auth
-- **Extensible** — add new services by defining fields in `lib/ai.js` and a scraper function in `local_agent/scraper.js`
+## 9 Supported Services
+
+| Code | Command | Portal | Category | Required Fields |
+|------|---------|--------|----------|-----------------|
+| `SANA` | `/sana` | `sana.ir` | ⚖️ Judicial & Identity | `national_id`, `birth_date`, `mobile_number`, `serial_number` |
+| `GICA` | `/gica` | `gica.ir` | ⚖️ Judicial & Identity | `national_id`, `birth_date`, `mobile_number`, `tracking_code` |
+| `MYGOV` | `/mygov` | `my.gov.ir` | 🏛 e-Gov & Tax | `phone_number`, `national_id`, `birth_date`, `birth_place` |
+| `TAX` | `/tax` | `my.tax.gov.ir` | 🏛 e-Gov & Tax | `national_id`, `birth_date`, `mygov_token`, `tax_id` |
+| `INSURANCE` | `/insurance` | `eservice.tamin.ir` | 🏥 Insurance & Business | `national_id`, `birth_date`, `insurance_number`, `insurance_type` |
+| `MOJAVEZ` | `/mojavez` | `mojavez.ir` | 🏥 Insurance & Business | `national_id`, `birth_date`, `business_type`, `business_address` |
+| `AMLAK` | `/amlak` | `amlak.mrud.ir` | 🏠 Housing & Banking | `national_id`, `birth_date`, `address`, `post_code` |
+| `KHODNEWIS` | `/khodnevis` | `khodnevis.mrud.ir` | 🏠 Housing & Banking | `national_id`, `birth_date`, `contract_type` |
+| `SAMAN` | `/saman` | `saman.mrud.ir` | 🏠 Housing & Banking | `national_id`, `birth_date`, `loan_amount`, `loan_type` |
+
+---
+
+## Bot Commands Reference
+
+### 👤 Service-End Bot (Customer Commands)
+| Command | Description |
+|---------|-------------|
+| `/start` | Welcome menu with interactive Service Catalog, Slot Booking, Results & Support |
+| `/services` | Browse all 9 services by category, fees, and required documents |
+| `/slots` | View open manager appointment time slots and book a slot |
+| `/my_jobs` | View submitted requests, assigned manager, and delivered results |
+| `/support [msg]` | Open a two-way support ticket with a manager |
+| `/sana`, `/gica`, `/mygov`, `/tax`, `/insurance`, `/mojavez`, `/amlak`, `/khodnevis`, `/saman` | Start any of the 9 service workflows directly |
+| `/add_doc [key] [val]` | Save reusable credential in personal vault |
+| `/my_docs` | View saved credentials |
+| `/cancel` | Cancel current active flow |
+
+### 👨‍💼 Manager-End Bot (Provider / Manager Commands)
+| Command | Description |
+|---------|-------------|
+| `/manager` or `/panel` | Open the Manager Control Panel (status, queue, slots, services, tickets, stats) |
+| `/register_manager [code]` | Register as a service manager/provider |
+| `/set_time [date] [start] [end] [cap]` | Add an available time slot (e.g. `/set_time 1405/07/26 09:00 11:00 2`) |
+| `/working_hours [start] [end]` | Update daily working hours (e.g. `/working_hours 08:00 20:00`) |
+| `/complete [job_id] [result]` | Complete a job and send the result & rating prompt to the customer |
+| `/fail [job_id] [reason]` | Mark a job as failed with reason and notify customer |
+
+---
 
 ## Quick Start
 
-### Prerequisites
-- Node.js ≥ 18
-- PHP 8.2+ (for dashboard)
-- Telegram Bot token from [@BotFather](https://t.me/BotFather)
-- OpenAI-compatible API key (e.g. ArvanCloud GPT-5-Nano)
-
-### 1. Clone & Install
-
 ```bash
-git clone https://github.com/YOUR_USERNAME/smart-cafe-serverless.git
-cd smart-cafe-serverless
+# Run test suite (48 unit & end-to-end dual-bot tests)
+npm test
 
-# Root dependencies (Express server for Render)
-npm install
-
-# Local agent dependencies
-cd local_agent
-npm install
-npx playwright install chromium
-cd ..
-```
-
-### 2. Configure Secrets
-
-Copy `.env.example` to `.env` and fill in:
-
-```bash
-cp .env.example .env
-```
-
-| Variable | Description |
-|----------|-------------|
-| `BOT_TOKEN` | Telegram bot token |
-| `APP_URL` | Full URL of your deployed bot |
-| `OPENAI_API_KEY` | OpenAI-compatible API key |
-| `OPENAI_BASE_URL` | API gateway URL |
-| `OPENAI_MODEL` | Model name (e.g. `gpt-4o-mini`) |
-| `AGENT_API_KEY` | Shared secret for local agent (generate with `openssl rand -hex 32`) |
-
-### 3. Run Locally
-
-```bash
-# Start Express server (port 3000)
+# Start server (Express + Interactive Dual-Bot Simulator at /demo & Dashboard at /dashboard)
 npm start
-
-# In another terminal, start local agent
-cd local_agent
-node scraper.js
 ```
 
-### 4. Open Dashboard
-
+### Cloudflare Workers Serverless Deployment
 ```bash
-# If XAMPP is installed, files are already in htdocs
-# Otherwise, serve dashboard/ with any PHP server
-cd dashboard
-php -S localhost:8080
+npx wrangler d1 execute smart-cafe-db --file=schema.sql
+npx wrangler deploy
 ```
-
-Visit `http://localhost/dashboard/` and login with `AGENT_API_KEY`.
-
-## Architecture
-
-```
-smart-cafe-serverless/
-├── .env.example                ← Placeholder secrets
-├── .gitignore                  ← Prevents secret leaks
-├── SECURITY.md                 ← Security standards
-├── AGENTS.md                   ← AI assistant conventions
-├── README.md                   ← This file
-├── package.json                ← Express server dependencies
-├── server.js                   ← Render.com Express server
-├── wrangler.toml               ← Cloudflare Workers config
-├── schema.js / schema.sql      ← Database schema
-├── src/
-│   ├── index.js                ← Cloudflare Workers entry
-│   ├── handlers/
-│   │   ├── message.js          ← Telegram message handler
-│   │   └── callback_query.js   ← Inline button handler
-│   └── lib/
-│       ├── db.js               ← SQLite wrapper
-│       ├── telegram.js         ← Telegram API client
-│       └── ai.js               ← AI slot-filling logic
-├── handlers/                   ← tgcloud SDK handlers
-├── lib/
-│   ├── ai.js                   ← AI field definitions
-│   ├── dashboard.js            ← Dashboard HTML builder
-│   └── security.js             ← Validation utilities
-├── local_agent/
-│   ├── .env                    ← Local secrets (gitignored)
-│   ├── package.json            ← Agent deps
-│   └── scraper.js              ← Playwright automation
-└── dashboard/                  ← PHP admin dashboard
-    ├── index.php
-    ├── api.php
-    ├── config.php
-    ├── auth.php
-    ├── login.php
-    └── assets/
-        ├── css/style.css
-        └── js/app.js
-```
-
-## Bot Commands
-
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome message |
-| `/help` | Detailed help |
-| `/sana` | SANA registration |
-| `/gica` | GICA registration |
-| `/mygov` | my.gov.ir login |
-| `/tax` | my.tax.gov.ir tax tasks |
-| `/insurance` | eservice.tamin.ir insurance |
-| `/mojavez` | mojavez.ir business license |
-| `/amlak` | amlak.mrud.ir property inquiry |
-| `/khodnevis` | khodnevis.mrud.ir contracts |
-| `/saman` | saman.mrud.ir loans |
-| `/add_doc [name] [value]` | Save credential |
-| `/my_docs` | View saved credentials |
-| `/link_chat [chat_id]` | Link group/channel |
-| `/cancel` | Cancel current session |
-
-## Roadmap
-
-### Phase 1 — Core Bot & AI (Completed)
-- [x] Telegram bot with command routing
-- [x] AI slot-filling FSM for SANA/GICA
-- [x] Local Playwright agent with CAPTCHA handling
-- [x] SQLite database with jobs queue
-- [x] Basic Express dashboard
-
-### Phase 2 — Service Expansion (Completed)
-- [x] 9 government services integrated
-- [x] Service tree navigation in dashboard
-- [x] Per-service workflow forms
-- [x] AI field definitions for all services
-- [x] Scraper automation for all portals
-
-### Phase 3 — Security & Polish (Completed)
-- [x] `.gitignore` and secret sanitization
-- [x] Rate limiting and security headers
-- [x] Input validation and sanitization
-- [x] PHP dashboard with auth, CSRF, sessions
-- [x] Light/dark mode toggle
-- [x] RTL Persian interface
-- [x] Interactive demo page
-
-### Phase 4 — Production Readiness (Planned)
-- [ ] Docker compose for one-command deployment
-- [ ] PostgreSQL migration option (from SQLite)
-- [ ] Webhook secret verification for Telegram
-- [ ] Multi-operator support (concurrent CAPTCHA solving)
-- [ ] PDF/Excel export for job reports
-- [ ] Telegram bot analytics and usage stats
-- [ ] CI/CD pipeline with GitHub Actions
-- [ ] Automated portal selector updater
-
-### Phase 5 — Scaling (Future)
-- [ ] Queue system with Redis/RabbitMQ
-- [ ] Multiple cafe branches support
-- [ ] Role-based access control (RBAC)
-- [ ] API versioning and OpenAPI docs
-- [ ] Mobile app for operators (React Native)
-- [ ] ML-based CAPTCHA solving integration
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow the conventions in `AGENTS.md`
-- All secrets must stay in `.env` (never commit them)
-- Run `node --check` on JS files before committing
-- Test new services locally with `demo.html`
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for full security standards.
-
-**Key principles:**
-- Never commit secrets or API keys
-- All API endpoints require authentication
-- Input validation on all user data
-- Rate limiting on public endpoints
-- Security headers on all responses
-
-## License
-
-MIT © Smart Cafe Team
