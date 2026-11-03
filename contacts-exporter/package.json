@@ -1,0 +1,13 @@
+{
+  "name": "contacts-exporter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser extension that exports contacts from Telegram, WhatsApp, Rubika and Eitaa web apps to CSV / vCard / Google Contacts / JSON — entirely locally.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "preview": "node tools/serve.js"
+  },
+  "keywords": ["contacts", "export", "telegram", "whatsapp", "rubika", "eitaa", "vcard", "chrome-extension"],
+  "license": "MIT"
+}

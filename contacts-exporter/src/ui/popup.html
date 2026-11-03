@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact Exporter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </span>
+        <div class="brandText">
+          <h1 data-i18n="title">Contact Exporter</h1>
+          <p class="sub" data-i18n="subtitle">Telegram · WhatsApp · Rubika · Eitaa</p>
+        </div>
+      </div>
+      <button id="langBtn" class="langBtn" type="button" title="Language">فا</button>
+    </header>
+
+    <main id="main">
+      <section id="unsupported" class="card" hidden>
+        <h2 class="cardTitle" data-i18n="noSiteTitle">Open one of these web apps</h2>
+        <p class="muted small" data-i18n="noSiteBody"></p>
+        <div id="openList" class="openList"></div>
+      </section>
+
+      <section id="sitePanel" class="card siteCard" hidden>
+        <div class="siteHead">
+          <span class="dot" id="siteDot"></span>
+          <div class="siteName">
+            <strong id="siteName">Telegram</strong>
+            <span class="muted tiny" id="siteMeta">0 contacts</span>
+          </div>
+          <span class="badge" id="siteBadge">0</span>
+        </div>
+
+        <p class="hintBox"><span class="hintLabel" data-i18n="hint">Before scanning</span><span id="siteHint"></span></p>
+
+        <div class="row">
+          <button id="scanBtn" class="btn primary grow" type="button" data-i18n="scan">Scan contacts</button>
+          <button id="teachBtn" class="btn" type="button" data-i18n="teach" data-i18n-title="teach">Teach me</button>
+          <button id="diagBtn" class="btn ghost" type="button" data-i18n="diagnose">Diagnose</button>
+        </div>
+
+        <div id="live" class="live" hidden>
+          <div class="bar"><span id="liveBar"></span></div>
+          <div class="liveRow">
+            <span class="pulse"></span>
+            <span id="liveText"></span>
+          </div>
+        </div>
+
+        <div id="siteError" class="alert" hidden></div>
+        <div id="diagBox" class="diagBox" hidden></div>
+      </section>
+
+      <section class="card">
+        <div id="chips" class="chips"></div>
+        <div class="totalRow">
+          <strong id="totalCount">0</strong>
+          <span id="totalMeta" class="muted tiny"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="cardTitle" data-i18n="exportTitle">Export</h2>
+        <div class="stack">
+          <select id="scope" class="field"></select>
+          <select id="format" class="field"></select>
+        </div>
+        <div class="row">
+          <button id="exportBtn" class="btn primary grow" type="button" data-i18n="exportBtn">Download</button>
+          <button id="copyBtn" class="btn ghost" type="button" data-i18n="copyBtn">Copy CSV</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <input id="search" class="field" type="search" data-i18n-ph="search" />
+        <ul id="contactList" class="list"></ul>
+        <p id="listEmpty" class="muted small empty" data-i18n="empty"></p>
+      </section>
+
+      <details class="card details" id="settingsBox">
+        <summary data-i18n="settings">Settings</summary>
+        <div class="grid2">
+          <label class="lbl">
+            <span data-i18n="countryCode">Default country code</span>
+            <input id="countryCode" class="field" inputmode="numeric" placeholder="98" />
+          </label>
+          <label class="lbl">
+            <span data-i18n="maxRows">Row limit per scan</span>
+            <input id="maxRows" class="field" type="number" min="10" step="50" />
+          </label>
+          <label class="lbl">
+            <span data-i18n="maxSeconds">Time limit per scan (seconds)</span>
+            <input id="maxSeconds" class="field" type="number" min="10" step="10" />
+          </label>
+          <label class="lbl">
+            <span data-i18n="language">Language</span>
+            <select id="langSelect" class="field">
+              <option value="en">English</option>
+              <option value="fa">فارسی</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="requirePhone" /> <span data-i18n="requirePhone"></span></label>
+        <label class="check"><input type="checkbox" id="includeRaw" /> <span data-i18n="includeRaw"></span></label>
+        <p class="muted tiny" id="countryHelp" data-i18n="countryCodeHelp"></p>
+        <div class="row">
+          <button id="clearSiteBtn" class="btn danger" type="button" data-i18n="clearSite">Clear this app</button>
+          <button id="clearAllBtn" class="btn danger ghost" type="button" data-i18n="clearAll">Clear everything</button>
+        </div>
+        <p class="muted tiny" id="lastScan"></p>
+      </details>
+
+      <details class="card details">
+        <summary data-i18n="helpTitle">How it works</summary>
+        <p class="muted small" data-i18n="helpBody"></p>
+      </details>
+    </main>
+
+    <footer class="foot">
+      <span class="lock" aria-hidden="true">🔒</span>
+      <span data-i18n="privacy">100% local — nothing ever leaves your browser</span>
+    </footer>
+
+    <!-- dev/mock-chrome.js is a no-op inside a real extension; it only provides
+         a chrome.* stub when this file is opened as a plain web page (preview). -->
+    <script src="../../dev/mock-chrome.js"></script>
+    <script src="../lib/util.js"></script>
+    <script src="../lib/extract.js"></script>
+    <script src="../lib/adapters.js"></script>
+    <script src="../lib/exporters.js"></script>
+    <script src="../lib/i18n.js"></script>
+    <script src="../lib/store.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
