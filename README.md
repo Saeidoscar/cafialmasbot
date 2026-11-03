@@ -99,6 +99,21 @@ php -S localhost:8080
 
 Visit `http://localhost/dashboard/` and login with `AGENT_API_KEY`.
 
+## Contact Exporter (browser extension)
+
+`contacts-exporter/` is a standalone Chrome/Edge/Brave extension that exports your own contacts from the
+**Telegram, WhatsApp, Rubika and Eitaa web apps** to CSV, vCard (`.vcf`), Google Contacts CSV or JSON.
+It reads only the contact rows your logged-in browser already displays, scrolls the list to load everything,
+and stores the result locally — no credentials, no network calls, no server.
+
+```bash
+# install: chrome://extensions → Developer mode → Load unpacked → select contacts-exporter/
+cd contacts-exporter && npm test        # parsing + exporter unit tests
+npm run preview                          # interactive popup preview on :4173/preview/
+```
+
+Full guide, per-app notes and troubleshooting: [`contacts-exporter/README.md`](contacts-exporter/README.md).
+
 ## Architecture
 
 ```
@@ -130,6 +145,7 @@ smart-cafe-serverless/
 │   ├── .env                    ← Local secrets (gitignored)
 │   ├── package.json            ← Agent deps
 │   └── scraper.js              ← Playwright automation
+├── contacts-exporter/          ← Browser extension (see its own README)
 └── dashboard/                  ← PHP admin dashboard
     ├── index.php
     ├── api.php

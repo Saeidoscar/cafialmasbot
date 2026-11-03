@@ -1,0 +1,78 @@
+{
+  "manifest_version": 3,
+  "name": "Contact Exporter — Telegram · WhatsApp · Rubika · Eitaa",
+  "short_name": "Contact Exporter",
+  "version": "1.0.0",
+  "description": "Export your contacts from Telegram, WhatsApp, Rubika and Eitaa web apps to CSV, vCard (.vcf), Google Contacts CSV or JSON. 100% local — no passwords, no servers.",
+  "minimum_chrome_version": "102",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://web.telegram.org/*",
+    "https://web.whatsapp.com/*",
+    "https://web.rubika.ir/*",
+    "https://rubika.ir/*",
+    "https://web.eitaa.com/*",
+    "https://eitaa.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "src/ui/popup.html",
+    "default_title": "Export contacts",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://web.telegram.org/*",
+        "https://web.whatsapp.com/*",
+        "https://web.rubika.ir/*",
+        "https://rubika.ir/*",
+        "https://web.eitaa.com/*",
+        "https://eitaa.com/*"
+      ],
+      "js": [
+        "src/lib/util.js",
+        "src/lib/extract.js",
+        "src/lib/adapters.js",
+        "src/lib/store.js",
+        "src/content/engine.js",
+        "src/content/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*",
+        "src/ui/*"
+      ],
+      "matches": [
+        "https://web.telegram.org/*",
+        "https://web.whatsapp.com/*",
+        "https://web.rubika.ir/*",
+        "https://rubika.ir/*",
+        "https://web.eitaa.com/*",
+        "https://eitaa.com/*"
+      ]
+    }
+  ]
+}
